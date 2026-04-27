@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# DECOCO — Hộp Quà Tặng Cá Nhân Hoá
 
-## Getting Started
+Website bán hàng cho phép khách hàng thiết kế hộp quà cá nhân hoá. Stack: Next.js + Supabase + Fabric.js.
 
-First, run the development server:
+## Phát triển cục bộ
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Cấu hình `.env.local`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://<project-id>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon-key>
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+RESEND_API_KEY=<resend-api-key>
+ADMIN_EMAIL=admin@decoco.vn
+NEXT_PUBLIC_SITE_URL=https://decoco.vn
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Setup Supabase
 
-## Learn More
+1. Tạo project mới tại [supabase.com](https://supabase.com) (region: Southeast Asia)
+2. Chạy migrations:
+   ```bash
+   # Cài Supabase CLI nếu chưa có
+   npx supabase login
+   npx supabase link --project-ref <project-id>
+   npx supabase db push
+   ```
+   Hoặc copy-paste `supabase/migrations/001_initial_schema.sql` và `002_seed_data.sql` vào SQL Editor trên Supabase Dashboard.
 
-To learn more about Next.js, take a look at the following resources:
+3. Tạo Storage buckets (Supabase Dashboard → Storage):
+   - `designs` — Public
+   - `products` — Public
+   - `site` — Public
+   - `frames` — Public
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Tạo admin user (Supabase Dashboard → Authentication → Users → Invite User):
+   - Email: `admin@decoco.vn`
+   - Password: `Decoco@123`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Setup Resend (Email)
 
-## Deploy on Vercel
+1. Tạo tài khoản tại [resend.com](https://resend.com)
+2. Verify domain `decoco.vn` (thêm DNS records: SPF, DKIM)
+3. Lấy API key → thêm vào `.env.local` và Supabase Edge Function secrets
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deploy Edge Function (Email notification)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npx supabase functions deploy notify-new-order
+npx supabase secrets set RESEND_API_KEY=<key> ADMIN_EMAIL=admin@decoco.vn APP_URL=https://decoco.vn
+```
+
+Sau đó cấu hình **Database Webhook** trong Supabase Dashboard:
+- Table: `orders`, Event: `INSERT`
+- URL: `https://<project-id>.supabase.co/functions/v1/notify-new-order`
+
+## Deploy lên Vercel
+
+1. Push code lên GitHub
+2. Import project vào [vercel.com](https://vercel.com)
+3. Thêm env vars trong Vercel Dashboard → Project Settings → Environment Variables
+4. Config custom domain `decoco.vn`
