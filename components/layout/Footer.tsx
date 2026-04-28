@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 
 const defaultContent: Record<string, string> = {
-  footer_slogan: "Trang sức DECOCO — Vẻ đẹp từ những điều nhỏ bé",
+  footer_slogan: "Trang sức DECOCO —\nVẻ đẹp từ những điều nhỏ bé",
   footer_email: "hello@decoco.vn",
   footer_phone: "0901 234 567",
   footer_address: "Hà Nội, Việt Nam",
@@ -39,7 +39,7 @@ export default async function Footer() {
           {/* Brand */}
           <div className="space-y-3">
             <p className="font-heading text-2xl font-semibold italic">DECOCO</p>
-            <p className="text-sm text-background/70 leading-relaxed max-w-xs">
+            <p className="text-sm text-background/70 leading-relaxed whitespace-pre-wrap">
               {content.footer_slogan}
             </p>
             {/* Social icons */}
