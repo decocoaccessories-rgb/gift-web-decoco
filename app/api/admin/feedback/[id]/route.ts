@@ -3,14 +3,10 @@ import { z } from "zod";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
 const patchSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
-  slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/).optional(),
-  description: z.string().optional(),
-  price: z.number().int().positive().optional(),
-  stock: z.number().int().min(0).optional(),
-  is_visible: z.boolean().optional(),
-  images: z.array(z.string()).max(10).optional(),
+  image_url: z.string().min(1).optional(),
+  alt_text: z.string().optional(),
   sort_order: z.number().int().optional(),
+  is_visible: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -24,24 +20,16 @@ export async function PATCH(
   const { id } = await params;
   const body = await request.json().catch(() => null);
   const parsed = patchSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid data" }, { status: 422 });
-  }
+  if (!parsed.success) return NextResponse.json({ error: "Invalid" }, { status: 422 });
 
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("products")
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
-    .eq("id", id)
-    .select()
-    .single();
-
+  const { error } = await admin.from("feedback_items").update(parsed.data).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+  return NextResponse.json({ success: true });
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
@@ -50,7 +38,7 @@ export async function DELETE(
 
   const { id } = await params;
   const admin = createAdminClient();
-  const { error } = await admin.from("products").delete().eq("id", id);
+  const { error } = await admin.from("feedback_items").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
