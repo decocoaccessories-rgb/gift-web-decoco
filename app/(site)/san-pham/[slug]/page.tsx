@@ -35,13 +35,25 @@ async function getProduct(slug: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("products")
-    .select("id, name, slug, description, price, stock, images, is_visible")
+    .select("id, name, slug, description, highlights, price, stock, images, is_visible")
     .eq("slug", slug)
     .single();
   return data as Pick<
     Product,
-    "id" | "name" | "slug" | "description" | "price" | "stock" | "images" | "is_visible"
+    "id" | "name" | "slug" | "description" | "highlights" | "price" | "stock" | "images" | "is_visible"
   > | null;
+}
+
+const DEFAULT_HIGHLIGHTS = [
+  "In UV độ nét cao, màu sắc trung thực",
+  "Thiết kế hoàn toàn theo ý bạn",
+  "Thanh toán khi nhận hàng (COD)",
+];
+
+function parseHighlights(raw: string | null | undefined): string[] {
+  if (!raw) return DEFAULT_HIGHLIGHTS;
+  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return lines.length ? lines : DEFAULT_HIGHLIGHTS;
 }
 
 async function getFrames(productId: string) {
@@ -126,9 +138,9 @@ export default async function ProductPage({ params }: PageProps) {
           )}
 
           <div className="text-xs text-muted-foreground bg-secondary/30 rounded-lg px-4 py-3 space-y-1">
-            <p>✓ In UV độ nét cao, màu sắc trung thực</p>
-            <p>✓ Thiết kế hoàn toàn theo ý bạn</p>
-            <p>✓ Thanh toán khi nhận hàng (COD)</p>
+            {parseHighlights(product!.highlights).map((line, i) => (
+              <p key={i}>✓ {line}</p>
+            ))}
           </div>
         </div>
       </div>

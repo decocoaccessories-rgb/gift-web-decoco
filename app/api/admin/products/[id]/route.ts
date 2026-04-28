@@ -6,6 +6,7 @@ const patchSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/).optional(),
   description: z.string().optional(),
+  highlights: z.string().nullable().optional(),
   price: z.number().int().positive().optional(),
   stock: z.number().int().min(0).optional(),
   is_visible: z.boolean().optional(),

@@ -35,6 +35,7 @@ export interface Database {
           name: string;
           slug: string;
           description: string | null;
+          highlights: string | null;
           price: number;
           stock: number;
           is_visible: boolean;

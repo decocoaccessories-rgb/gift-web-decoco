@@ -11,7 +11,7 @@ import type { Product } from "@/lib/supabase/types";
 
 type ProductRow = Pick<
   Product,
-  "id" | "name" | "slug" | "price" | "stock" | "is_visible" | "images" | "sort_order" | "description"
+  "id" | "name" | "slug" | "price" | "stock" | "is_visible" | "images" | "sort_order" | "description" | "highlights"
 >;
 
 interface Props {
@@ -30,6 +30,7 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
     price: product?.price?.toString() ?? "",
     stock: product?.stock?.toString() ?? "0",
     description: product?.description ?? "",
+    highlights: product?.highlights ?? "",
     is_visible: product?.is_visible ?? true,
     sort_order: product?.sort_order?.toString() ?? "0",
   });
@@ -94,6 +95,7 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
       price: parseInt(form.price),
       stock: parseInt(form.stock),
       description: form.description || undefined,
+      highlights: form.highlights.trim() ? form.highlights : null,
       is_visible: form.is_visible,
       sort_order: parseInt(form.sort_order),
       images,
@@ -179,6 +181,19 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
               className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-none"
               placeholder="Mô tả sản phẩm..."
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="highlights">Điểm nổi bật</Label>
+            <textarea
+              id="highlights"
+              rows={4}
+              value={form.highlights}
+              onChange={(e) => setForm({ ...form, highlights: e.target.value })}
+              className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-none"
+              placeholder={"Mỗi dòng là một điểm nổi bật, ví dụ:\nIn UV độ nét cao, màu sắc trung thực\nThiết kế hoàn toàn theo ý bạn\nThanh toán khi nhận hàng (COD)"}
+            />
+            <p className="text-xs text-muted-foreground">Mỗi dòng sẽ hiển thị thành một dấu tích (✓) trên trang sản phẩm. Để trống để dùng giá trị mặc định.</p>
           </div>
 
           {/* Images */}
