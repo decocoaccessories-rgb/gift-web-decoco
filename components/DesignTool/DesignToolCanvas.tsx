@@ -24,9 +24,12 @@ interface DesignToolCanvasProps {
   productName: string;
   productPrice: number;
   frames: Pick<Frame, "id" | "name" | "thumbnail_url" | "config" | "sort_order">[];
+  hasVariants?: boolean;
+  selectedVariant?: { id: string; name: string } | null;
 }
 
-const CANVAS_SIZE = 800;
+const DEFAULT_CANVAS_WIDTH = 1772;
+const DEFAULT_CANVAS_HEIGHT = 1535;
 const MAX_HISTORY = 20;
 
 export default function DesignToolCanvas({
@@ -34,6 +37,8 @@ export default function DesignToolCanvas({
   productName,
   productPrice,
   frames,
+  hasVariants = false,
+  selectedVariant = null,
 }: DesignToolCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<FabricCanvas | null>(null);
@@ -52,6 +57,10 @@ export default function DesignToolCanvas({
   const [canRedo, setCanRedo] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [scale, setScale] = useState(1);
+  const [canvasDims, setCanvasDims] = useState<{ width: number; height: number }>({
+    width: DEFAULT_CANVAS_WIDTH,
+    height: DEFAULT_CANVAS_HEIGHT,
+  });
 
   // Save snapshot for undo/redo
   const saveSnapshot = useCallback(() => {
@@ -78,8 +87,8 @@ export default function DesignToolCanvas({
     import("fabric").then(({ Canvas }) => {
       if (!canvasRef.current) return;
       const canvas = new Canvas(canvasRef.current, {
-        width: CANVAS_SIZE,
-        height: CANVAS_SIZE,
+        width: DEFAULT_CANVAS_WIDTH,
+        height: DEFAULT_CANVAS_HEIGHT,
         backgroundColor: "#ffffff",
         preserveObjectStacking: true,
       });
@@ -157,12 +166,12 @@ export default function DesignToolCanvas({
     const container = containerRef.current;
     if (!container) return;
     const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? CANVAS_SIZE;
-      setScale(Math.min(1, width / CANVAS_SIZE));
+      const width = entries[0]?.contentRect.width ?? canvasDims.width;
+      setScale(Math.min(1, width / canvasDims.width));
     });
     observer.observe(container);
     return () => observer.disconnect();
-  }, []);
+  }, [canvasDims.width]);
 
   const handleUndo = useCallback(() => {
     const canvas = fabricRef.current;
@@ -195,18 +204,18 @@ export default function DesignToolCanvas({
     if (!canvas) return;
     const { IText } = await import("fabric");
     const text = new IText("Nhập chữ...", {
-      left: CANVAS_SIZE / 2,
-      top: CANVAS_SIZE / 2,
+      left: canvasDims.width / 2,
+      top: canvasDims.height / 2,
       originX: "center",
       originY: "center",
-      fontSize: 32,
+      fontSize: 64,
       fontFamily: "Be Vietnam Pro",
       fill: "#333333",
     });
     canvas.add(text);
     canvas.setActiveObject(text);
     canvas.renderAll();
-  }, []);
+  }, [canvasDims.width, canvasDims.height]);
 
   const handlePhotoUpload = useCallback(
     async (file: File) => {
@@ -227,13 +236,13 @@ export default function DesignToolCanvas({
       const url = URL.createObjectURL(processedFile);
       const { FabricImage } = await import("fabric");
       const img = await FabricImage.fromURL(url);
-      const maxDim = CANVAS_SIZE * 0.6;
+      const maxDim = Math.min(canvasDims.width, canvasDims.height) * 0.6;
       const imgW = img.width ?? 1;
       const imgH = img.height ?? 1;
       const factor = Math.min(maxDim / imgW, maxDim / imgH, 1);
       img.set({
-        left: CANVAS_SIZE / 2,
-        top: CANVAS_SIZE / 2,
+        left: canvasDims.width / 2,
+        top: canvasDims.height / 2,
         originX: "center",
         originY: "center",
         scaleX: factor,
@@ -244,7 +253,7 @@ export default function DesignToolCanvas({
       canvas.renderAll();
       URL.revokeObjectURL(url);
     },
-    []
+    [canvasDims.width, canvasDims.height]
   );
 
   const handleApplyFrame = useCallback(async (frame: Pick<Frame, "id" | "name" | "thumbnail_url" | "config">) => {
@@ -252,6 +261,12 @@ export default function DesignToolCanvas({
     if (!canvas) return;
 
     const config = frame.config as FrameConfig;
+    const targetWidth = config.canvasWidth ?? DEFAULT_CANVAS_WIDTH;
+    const targetHeight = config.canvasHeight ?? DEFAULT_CANVAS_HEIGHT;
+
+    // Resize fabric canvas to match frame dimensions
+    canvas.setDimensions({ width: targetWidth, height: targetHeight });
+    setCanvasDims({ width: targetWidth, height: targetHeight });
 
     // Clear canvas, keep white background
     canvas.clear();
@@ -264,8 +279,8 @@ export default function DesignToolCanvas({
       bg.set({
         left: 0,
         top: 0,
-        scaleX: CANVAS_SIZE / (bg.width ?? CANVAS_SIZE),
-        scaleY: CANVAS_SIZE / (bg.height ?? CANVAS_SIZE),
+        scaleX: targetWidth / (bg.width ?? targetWidth),
+        scaleY: targetHeight / (bg.height ?? targetHeight),
         selectable: false,
         evented: false,
       });
@@ -391,6 +406,7 @@ export default function DesignToolCanvas({
         frameId: selectedFrame?.id,
         designImageUrl,
         canvasJSON: JSON.stringify(canvas.toJSON()),
+        variantName: selectedVariant?.name,
       };
       sessionStorage.setItem("decoco_design", JSON.stringify(designInfo));
 
@@ -400,7 +416,7 @@ export default function DesignToolCanvas({
     } finally {
       setExporting(false);
     }
-  }, [productId, productName, productPrice, selectedFrame, router]);
+  }, [productId, productName, productPrice, selectedFrame, selectedVariant, router]);
 
   return (
     <div className="space-y-4">
@@ -520,16 +536,16 @@ export default function DesignToolCanvas({
           <div
             className="border border-border rounded-xl overflow-hidden bg-white shadow-sm mx-auto"
             style={{
-              width: Math.round(CANVAS_SIZE * scale),
-              height: Math.round(CANVAS_SIZE * scale),
+              width: Math.round(canvasDims.width * scale),
+              height: Math.round(canvasDims.height * scale),
             }}
           >
             <div
               style={{
                 transform: `scale(${scale})`,
                 transformOrigin: "top left",
-                width: CANVAS_SIZE,
-                height: CANVAS_SIZE,
+                width: canvasDims.width,
+                height: canvasDims.height,
               }}
             >
               <canvas ref={canvasRef} />
@@ -544,11 +560,14 @@ export default function DesignToolCanvas({
       )}
 
       {/* Proceed button */}
-      <div className="flex justify-end pt-2">
+      <div className="flex flex-col items-end gap-2 pt-2">
+        {hasVariants && !selectedVariant && (
+          <p className="text-xs text-destructive">Vui lòng chọn phân loại màu trước khi đặt hàng.</p>
+        )}
         <Button
           size="lg"
           onClick={handleExport}
-          disabled={exporting}
+          disabled={exporting || (hasVariants && !selectedVariant)}
           className="gap-2"
         >
           <Upload className="h-4 w-4" />

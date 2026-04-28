@@ -40,6 +40,7 @@ type OrderRow = Pick<
   | "status"
   | "price_at_order"
   | "design_image_url"
+  | "variant_name"
   | "created_at"
 >;
 

@@ -36,6 +36,7 @@ interface DesignInfo {
   designImageUrl?: string;
   frameId?: string;
   canvasJSON?: string;
+  variantName?: string;
 }
 
 export default function CheckoutPage() {
@@ -81,6 +82,7 @@ export default function CheckoutPage() {
           design_data: designInfo.canvasJSON
             ? JSON.parse(designInfo.canvasJSON)
             : undefined,
+          variant_name: designInfo.variantName ?? null,
           ...values,
         }),
       });
@@ -284,6 +286,11 @@ export default function CheckoutPage() {
                   <p className="text-sm font-medium leading-snug">
                     {designInfo.productName}
                   </p>
+                  {designInfo.variantName && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Phân loại: {designInfo.variantName}
+                    </p>
+                  )}
                   <p className="mt-1 text-sm font-semibold text-primary">
                     {formatPrice(designInfo.productPrice)}
                   </p>

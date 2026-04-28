@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
+const variantSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1).max(100),
+  image_url: z.string().url(),
+});
+
 const createSchema = z.object({
   name: z.string().min(1).max(200),
   slug: z.string().min(1).max(100).regex(/^[a-z0-9-]+$/),
   description: z.string().optional(),
   highlights: z.string().nullable().optional(),
+  variants: z.array(variantSchema).max(20).optional(),
   price: z.number().int().positive(),
   stock: z.number().int().min(0),
   is_visible: z.boolean().default(true),

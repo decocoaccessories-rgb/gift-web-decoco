@@ -1,21 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, Plus, Trash2, X, Loader2, Save } from "lucide-react";
+import { RefreshCw, Plus, Trash2, X, Loader2, Save, Upload } from "lucide-react";
 import type { Frame, FrameConfig } from "@/lib/supabase/types";
 
 type FrameRow = Pick<Frame, "id" | "name" | "product_id" | "thumbnail_url" | "config" | "sort_order">;
 
 const DEFAULT_CONFIG: FrameConfig = {
-  canvasWidth: 800,
-  canvasHeight: 800,
+  canvasWidth: 1772,
+  canvasHeight: 1535,
   photoSlots: [
-    { id: "slot1", x: 100, y: 100, width: 600, height: 600, shape: "rect" },
+    { id: "slot1", x: 200, y: 200, width: 1372, height: 1135, shape: "rect" },
   ],
 };
 
@@ -163,6 +163,43 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
   const [configError, setConfigError] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [uploadingBg, setUploadingBg] = useState(false);
+  const bgInputRef = useRef<HTMLInputElement>(null);
+
+  function getCurrentBgUrl(): string | null {
+    try {
+      const parsed = JSON.parse(configJson) as Partial<FrameConfig>;
+      return parsed.backgroundImage ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function handleUploadBackground(file: File) {
+    setUploadingBg(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("bucket", "frames");
+      const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok || !data.url) {
+        toast.error(`Lỗi upload: ${data.error ?? "unknown"}`);
+        return;
+      }
+      let parsed: FrameConfig;
+      try {
+        parsed = JSON.parse(configJson) as FrameConfig;
+      } catch {
+        parsed = { ...DEFAULT_CONFIG };
+      }
+      parsed.backgroundImage = data.url as string;
+      setConfigJson(JSON.stringify(parsed, null, 2));
+      toast.success("Đã tải ảnh nền");
+    } finally {
+      setUploadingBg(false);
+    }
+  }
 
   async function handleSave() {
     setConfigError("");
@@ -220,6 +257,55 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
             <Input value={productId} onChange={(e) => setProductId(e.target.value)} placeholder="UUID sản phẩm" />
           </div>
           <div className="space-y-1.5">
+            <Label>Ảnh nền</Label>
+            <div className="flex items-start gap-3">
+              <div className="relative h-20 w-20 rounded-lg overflow-hidden border border-border bg-secondary/20 shrink-0">
+                {getCurrentBgUrl() ? (
+                  <Image
+                    src={getCurrentBgUrl() as string}
+                    alt="Ảnh nền khung"
+                    fill
+                    sizes="80px"
+                    className="object-contain"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground/50 text-center px-1">
+                    chưa có ảnh
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 space-y-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={uploadingBg}
+                  onClick={() => bgInputRef.current?.click()}
+                  className="gap-1.5"
+                >
+                  {uploadingBg
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <Upload className="h-3.5 w-3.5" />
+                  }
+                  {uploadingBg ? "Đang tải..." : "Tải ảnh PNG"}
+                </Button>
+                <p className="text-xs text-muted-foreground">PNG/JPG/WebP. Khuyến nghị 1772×1535 để khớp canvas.</p>
+              </div>
+            </div>
+            <input
+              ref={bgInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleUploadBackground(file);
+                e.target.value = "";
+              }}
+            />
+          </div>
+
+          <div className="space-y-1.5">
             <Label>Cấu hình JSON</Label>
             <textarea
               rows={12}
@@ -229,7 +315,7 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
             />
             {configError && <p className="text-xs text-destructive">{configError}</p>}
             <p className="text-xs text-muted-foreground">
-              photoSlots: mảng các slot với x, y, width, height, shape (rect/circle/rounded-rect)
+              photoSlots: mảng các slot với x, y, width, height, shape (rect/circle/rounded-rect). Mặc định canvas 1772×1535.
             </p>
           </div>
           {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}

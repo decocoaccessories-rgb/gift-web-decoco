@@ -2,10 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import type { Product, Frame } from "@/lib/supabase/types";
-import ImageSlider from "@/components/ui/ImageSlider";
-import DesignTool from "@/components/DesignTool/DesignTool";
-import { formatPrice } from "@/lib/utils";
-import { Badge } from "@/components/ui/badge";
+import ProductInteractive from "./ProductInteractive";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -35,12 +32,12 @@ async function getProduct(slug: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("products")
-    .select("id, name, slug, description, highlights, price, stock, images, is_visible")
+    .select("id, name, slug, description, highlights, variants, price, stock, images, is_visible")
     .eq("slug", slug)
     .single();
   return data as Pick<
     Product,
-    "id" | "name" | "slug" | "description" | "highlights" | "price" | "stock" | "images" | "is_visible"
+    "id" | "name" | "slug" | "description" | "highlights" | "variants" | "price" | "stock" | "images" | "is_visible"
   > | null;
 }
 
@@ -83,87 +80,13 @@ export default async function ProductPage({ params }: PageProps) {
     notFound();
   }
 
-  const images = (product!.images ?? []) as string[];
-  const stock = product!.stock;
-  const outOfStock = stock === 0;
-  const lowStock = stock > 0 && stock <= 5;
-
   return (
     <div className="container mx-auto px-4 py-10 max-w-6xl">
-      {/* Product info grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
-        {/* Left: image slider */}
-        <ImageSlider images={images} alt={product!.name} />
-
-        {/* Right: info */}
-        <div className="space-y-5">
-          <div>
-            <h1 className="font-heading text-2xl md:text-3xl font-semibold leading-snug">
-              {product!.name}
-            </h1>
-            <p className="mt-2 text-2xl font-semibold text-primary">
-              {formatPrice(product!.price)}
-            </p>
-          </div>
-
-          {/* Stock status */}
-          {outOfStock ? (
-            <Badge variant="secondary" className="text-sm">
-              Hết hàng
-            </Badge>
-          ) : lowStock ? (
-            <p className="text-sm font-medium text-destructive">
-              Chỉ còn {stock} sản phẩm!
-            </p>
-          ) : (
-            <p className="text-sm text-muted-foreground">Còn hàng</p>
-          )}
-
-          {/* Description */}
-          {product!.description && (
-            <div
-              className="prose prose-sm max-w-none text-muted-foreground leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: product!.description }}
-            />
-          )}
-
-          {/* CTA */}
-          {!outOfStock && (
-            <a
-              href="#design-tool"
-              className="inline-flex items-center justify-center h-10 px-6 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Bắt đầu thiết kế ngay
-            </a>
-          )}
-
-          <div className="text-xs text-muted-foreground bg-secondary/30 rounded-lg px-4 py-3 space-y-1">
-            {parseHighlights(product!.highlights).map((line, i) => (
-              <p key={i}>✓ {line}</p>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Design tool */}
-      {!outOfStock && (
-        <section id="design-tool" className="mt-16">
-          <div className="mb-6">
-            <p className="text-sm font-medium text-primary uppercase tracking-widest mb-1">
-              Công cụ thiết kế
-            </p>
-            <h2 className="font-heading text-2xl md:text-3xl font-semibold">
-              Tạo thiết kế của bạn
-            </h2>
-          </div>
-          <DesignTool
-            productId={product!.id}
-            productName={product!.name}
-            productPrice={product!.price}
-            frames={frames}
-          />
-        </section>
-      )}
+      <ProductInteractive
+        product={product!}
+        frames={frames}
+        highlights={parseHighlights(product!.highlights)}
+      />
     </div>
   );
 }

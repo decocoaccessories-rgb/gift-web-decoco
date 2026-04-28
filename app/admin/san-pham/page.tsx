@@ -13,7 +13,7 @@ import ProductEditDialog from "./ProductEditDialog";
 
 type ProductRow = Pick<
   Product,
-  "id" | "name" | "slug" | "price" | "stock" | "is_visible" | "images" | "sort_order" | "description" | "highlights"
+  "id" | "name" | "slug" | "price" | "stock" | "is_visible" | "images" | "sort_order" | "description" | "highlights" | "variants"
 >;
 
 export default function AdminProductsPage() {

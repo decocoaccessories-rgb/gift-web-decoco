@@ -23,6 +23,7 @@ const orderSchema = z.object({
   frame_id: z.string().uuid().optional(),
   design_image_url: z.string().url().optional(),
   design_data: z.record(z.string(), z.unknown()).optional(),
+  variant_name: z.string().max(100).nullable().optional(),
   customer_name: z.string().min(2).max(100),
   customer_phone: z
     .string()
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
       frame_id: data.frame_id ?? null,
       design_image_url: data.design_image_url ?? null,
       design_data: (data.design_data as Record<string, unknown>) ?? null,
+      variant_name: data.variant_name ?? null,
       customer_name: data.customer_name,
       customer_phone: data.customer_phone,
       customer_email: data.customer_email || null,
@@ -127,7 +129,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   let query = admin
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_email, province, address, note, status, price_at_order, design_image_url, created_at, product_id", { count: "exact" })
+    .select("id, order_number, customer_name, customer_phone, customer_email, province, address, note, status, price_at_order, design_image_url, variant_name, created_at, product_id", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

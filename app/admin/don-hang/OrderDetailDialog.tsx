@@ -19,6 +19,7 @@ type OrderRow = Pick<
   | "status"
   | "price_at_order"
   | "design_image_url"
+  | "variant_name"
   | "created_at"
 >;
 
@@ -123,6 +124,12 @@ export default function OrderDetailDialog({ order, onClose }: Props) {
               Thông tin đơn
             </p>
             <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-sm">
+              {order.variant_name && (
+                <>
+                  <dt className="text-muted-foreground">Phân loại</dt>
+                  <dd className="font-medium">{order.variant_name}</dd>
+                </>
+              )}
               <dt className="text-muted-foreground">Giá trị</dt>
               <dd className="font-semibold text-primary">{formatPrice(order.price_at_order)}</dd>
               <dt className="text-muted-foreground">Trạng thái</dt>

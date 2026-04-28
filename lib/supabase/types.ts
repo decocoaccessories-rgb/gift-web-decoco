@@ -26,6 +26,12 @@ export interface FrameConfig {
   backgroundImage?: string;
 }
 
+export interface ProductVariant {
+  id: string;
+  name: string;
+  image_url: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -36,6 +42,7 @@ export interface Database {
           slug: string;
           description: string | null;
           highlights: string | null;
+          variants: ProductVariant[];
           price: number;
           stock: number;
           is_visible: boolean;
@@ -76,6 +83,7 @@ export interface Database {
           note: string | null;
           status: OrderStatus;
           price_at_order: number;
+          variant_name: string | null;
           created_at: string;
           updated_at: string;
         };

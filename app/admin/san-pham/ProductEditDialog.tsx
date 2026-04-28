@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import type { Product } from "@/lib/supabase/types";
+import type { Product, ProductVariant } from "@/lib/supabase/types";
 
 type ProductRow = Pick<
   Product,
-  "id" | "name" | "slug" | "price" | "stock" | "is_visible" | "images" | "sort_order" | "description" | "highlights"
+  "id" | "name" | "slug" | "price" | "stock" | "is_visible" | "images" | "sort_order" | "description" | "highlights" | "variants"
 >;
 
 interface Props {
@@ -35,10 +35,35 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
     sort_order: product?.sort_order?.toString() ?? "0",
   });
   const [images, setImages] = useState<string[]>((product?.images as string[]) ?? []);
+  const [variants, setVariants] = useState<ProductVariant[]>(
+    (product?.variants as ProductVariant[] | undefined) ?? []
+  );
   const [uploadingImg, setUploadingImg] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const imgInputRef = useRef<HTMLInputElement>(null);
+
+  function addVariant() {
+    setVariants((prev) => [
+      ...prev,
+      {
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `v_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        name: "",
+        image_url: images[0] ?? "",
+      },
+    ]);
+  }
+
+  function updateVariant(index: number, patch: Partial<ProductVariant>) {
+    setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, ...patch } : v)));
+  }
+
+  function removeVariant(index: number) {
+    setVariants((prev) => prev.filter((_, i) => i !== index));
+  }
 
   function autoSlug(name: string) {
     return name
@@ -89,6 +114,11 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
   async function handleSave() {
     setSaving(true);
     setError("");
+
+    const cleanedVariants = variants
+      .map((v) => ({ ...v, name: v.name.trim() }))
+      .filter((v) => v.name && v.image_url);
+
     const payload = {
       name: form.name,
       slug: form.slug,
@@ -96,6 +126,7 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
       stock: parseInt(form.stock),
       description: form.description || undefined,
       highlights: form.highlights.trim() ? form.highlights : null,
+      variants: cleanedVariants,
       is_visible: form.is_visible,
       sort_order: parseInt(form.sort_order),
       images,
@@ -194,6 +225,66 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
               placeholder={"Mỗi dòng là một điểm nổi bật, ví dụ:\nIn UV độ nét cao, màu sắc trung thực\nThiết kế hoàn toàn theo ý bạn\nThanh toán khi nhận hàng (COD)"}
             />
             <p className="text-xs text-muted-foreground">Mỗi dòng sẽ hiển thị thành một dấu tích (✓) trên trang sản phẩm. Để trống để dùng giá trị mặc định.</p>
+          </div>
+
+          {/* Variants */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Phân loại màu <span className="text-muted-foreground font-normal">({variants.length})</span></Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addVariant}
+                disabled={images.length === 0}
+                className="gap-1"
+              >
+                + Thêm phân loại
+              </Button>
+            </div>
+            {images.length === 0 && (
+              <p className="text-xs text-muted-foreground italic">Cần upload ít nhất 1 ảnh trước khi thêm phân loại.</p>
+            )}
+            {variants.length > 0 && (
+              <div className="space-y-2">
+                {variants.map((v, i) => (
+                  <div key={v.id} className="flex items-center gap-2">
+                    <div className="relative h-10 w-10 rounded-md overflow-hidden border border-border bg-secondary/20 shrink-0">
+                      {v.image_url ? (
+                        <Image src={v.image_url} alt={v.name || `Phân loại ${i + 1}`} fill sizes="40px" className="object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">—</div>
+                      )}
+                    </div>
+                    <Input
+                      value={v.name}
+                      onChange={(e) => updateVariant(i, { name: e.target.value })}
+                      placeholder="Tên phân loại (vd: Vàng hồng)"
+                      className="flex-1 h-8"
+                    />
+                    <select
+                      value={v.image_url}
+                      onChange={(e) => updateVariant(i, { image_url: e.target.value })}
+                      className="h-8 max-w-[140px] rounded-lg border border-input bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    >
+                      <option value="" disabled>Chọn ảnh</option>
+                      {images.map((url, idx) => (
+                        <option key={url} value={url}>Ảnh {idx + 1}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeVariant(i)}
+                      className="rounded-md p-1.5 text-destructive hover:bg-destructive/10"
+                      title="Xoá phân loại"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">Khách sẽ thấy các nút phân loại màu trên trang sản phẩm. Phải có cả tên và ảnh thì phân loại mới được lưu.</p>
           </div>
 
           {/* Images */}

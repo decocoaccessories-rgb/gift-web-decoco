@@ -20,6 +20,8 @@ interface DesignToolProps {
   productName: string;
   productPrice: number;
   frames: Pick<Frame, "id" | "name" | "thumbnail_url" | "config" | "sort_order">[];
+  hasVariants?: boolean;
+  selectedVariant?: { id: string; name: string } | null;
 }
 
 export default function DesignTool(props: DesignToolProps) {
