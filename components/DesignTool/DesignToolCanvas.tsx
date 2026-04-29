@@ -284,45 +284,7 @@ export default function DesignToolCanvas({
     canvas.clear();
     canvas.backgroundColor = "#ffffff";
 
-    // Draw photo slot placeholders FIRST (bottom layer)
-    const { Rect, Circle } = await import("fabric");
-    for (const slot of config.photoSlots ?? []) {
-      if (slot.shape === "circle") {
-        const r = Math.min(slot.width, slot.height) / 2;
-        const circle = new Circle({
-          left: slot.x,
-          top: slot.y,
-          radius: r,
-          fill: "rgba(200,200,200,0.3)",
-          stroke: "#aaaaaa",
-          strokeWidth: 1,
-          strokeDashArray: [5, 5],
-          selectable: false,
-          evented: false,
-          data: { isSlotPlaceholder: true, slotId: slot.id },
-        });
-        canvas.add(circle);
-      } else {
-        const rect = new Rect({
-          left: slot.x,
-          top: slot.y,
-          width: slot.width,
-          height: slot.height,
-          rx: slot.shape === "rounded-rect" ? 12 : 0,
-          ry: slot.shape === "rounded-rect" ? 12 : 0,
-          fill: "rgba(200,200,200,0.3)",
-          stroke: "#aaaaaa",
-          strokeWidth: 1,
-          strokeDashArray: [5, 5],
-          selectable: false,
-          evented: false,
-          data: { isSlotPlaceholder: true, slotId: slot.id },
-        });
-        canvas.add(rect);
-      }
-    }
-
-    // Load background image if present (top layer above placeholders and photos)
+    // Load background image (frame overlay - on top of user photos)
     if (config.backgroundImage) {
       const { FabricImage } = await import("fabric");
       const bg = await FabricImage.fromURL(config.backgroundImage, {
