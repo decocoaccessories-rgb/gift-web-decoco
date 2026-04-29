@@ -275,12 +275,17 @@ export default function DesignToolCanvas({
     // Load background image if present
     if (config.backgroundImage) {
       const { FabricImage } = await import("fabric");
-      const bg = await FabricImage.fromURL(config.backgroundImage);
+      const bg = await FabricImage.fromURL(config.backgroundImage, {
+        crossOrigin: "anonymous"
+      });
+      const imgWidth = bg.width || targetWidth;
+      const imgHeight = bg.height || targetHeight;
+
       bg.set({
         left: 0,
         top: 0,
-        scaleX: targetWidth / (bg.width ?? targetWidth),
-        scaleY: targetHeight / (bg.height ?? targetHeight),
+        scaleX: targetWidth / imgWidth,
+        scaleY: targetHeight / imgHeight,
         selectable: false,
         evented: false,
       });
@@ -522,7 +527,10 @@ export default function DesignToolCanvas({
       <div className="flex flex-col lg:flex-row gap-4">
         {/* Left panel: frames */}
         {frames.length > 0 && (
-          <div className="lg:w-48 xl:w-56 shrink-0">
+          <div
+            className="lg:w-48 xl:w-56 shrink-0"
+            style={{ height: Math.round(canvasDims.height * scale) }}
+          >
             <FramePanel
               frames={frames}
               selectedFrameId={selectedFrame?.id ?? null}
