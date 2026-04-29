@@ -213,6 +213,7 @@ export default function DesignToolCanvas({
       fill: "#333333",
     });
     canvas.add(text);
+    canvas.bringObjectToFront(text);
     canvas.setActiveObject(text);
     canvas.renderAll();
   }, [canvasDims.width, canvasDims.height]);
@@ -248,7 +249,17 @@ export default function DesignToolCanvas({
         scaleX: factor,
         scaleY: factor,
       });
-      canvas.add(img);
+      // Find the frame object to insert photo behind it
+      const frameObj = canvas
+        .getObjects()
+        .find((o) => (o as { data?: { isFrame?: boolean } }).data?.isFrame);
+      if (frameObj) {
+        const frameIndex = canvas.getObjects().indexOf(frameObj);
+        canvas.insertAt(frameIndex, img);
+      } else {
+        canvas.add(img);
+      }
+      
       canvas.setActiveObject(img);
       canvas.renderAll();
       URL.revokeObjectURL(url);
@@ -273,30 +284,7 @@ export default function DesignToolCanvas({
     canvas.clear();
     canvas.backgroundColor = "#ffffff";
 
-    // Load background image if present
-    if (config.backgroundImage) {
-      const { FabricImage } = await import("fabric");
-      const bg = await FabricImage.fromURL(config.backgroundImage, {
-        crossOrigin: "anonymous"
-      });
-      const imgWidth = bg.width || targetWidth;
-      const imgHeight = bg.height || targetHeight;
-
-      bg.set({
-        left: 0,
-        top: 0,
-        originX: "left",
-        originY: "top",
-        scaleX: targetWidth / imgWidth,
-        scaleY: targetHeight / imgHeight,
-        selectable: false,
-        evented: false,
-      });
-      canvas.add(bg);
-      canvas.sendObjectToBack(bg);
-    }
-
-    // Draw photo slot placeholders
+    // Draw photo slot placeholders FIRST (bottom layer)
     const { Rect, Circle } = await import("fabric");
     for (const slot of config.photoSlots ?? []) {
       if (slot.shape === "circle") {
@@ -332,6 +320,30 @@ export default function DesignToolCanvas({
         });
         canvas.add(rect);
       }
+    }
+
+    // Load background image if present (top layer above placeholders and photos)
+    if (config.backgroundImage) {
+      const { FabricImage } = await import("fabric");
+      const bg = await FabricImage.fromURL(config.backgroundImage, {
+        crossOrigin: "anonymous"
+      });
+      const imgWidth = bg.width || targetWidth;
+      const imgHeight = bg.height || targetHeight;
+
+      bg.set({
+        left: 0,
+        top: 0,
+        originX: "left",
+        originY: "top",
+        scaleX: targetWidth / imgWidth,
+        scaleY: targetHeight / imgHeight,
+        selectable: false,
+        evented: false,
+        data: { isFrame: true }
+      });
+      canvas.add(bg);
+      canvas.bringObjectToFront(bg);
     }
 
     canvas.renderAll();
@@ -379,6 +391,17 @@ export default function DesignToolCanvas({
     const clone = await active.clone();
     clone.set({ left: (active.left ?? 0) + 20, top: (active.top ?? 0) + 20 });
     canvas.add(clone);
+
+    // Enforce layer order: frame above photos, text above frame
+    const frameObj = canvas
+      .getObjects()
+      .find((o) => (o as { data?: { isFrame?: boolean } }).data?.isFrame);
+    if (frameObj) canvas.bringObjectToFront(frameObj);
+    const texts = canvas
+      .getObjects()
+      .filter((o) => o.type === "i-text" || o.type === "text");
+    texts.forEach((t) => canvas.bringObjectToFront(t));
+
     canvas.setActiveObject(clone);
     canvas.renderAll();
   }, []);
