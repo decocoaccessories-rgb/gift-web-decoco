@@ -261,46 +261,53 @@ export default function DesignToolCanvas({
     if (!canvas) return;
 
     const config = frame.config as FrameConfig;
-    const targetWidth = config.canvasWidth ?? DEFAULT_CANVAS_WIDTH;
-    const targetHeight = config.canvasHeight ?? DEFAULT_CANVAS_HEIGHT;
+    const cfgWidth = config.canvasWidth ?? DEFAULT_CANVAS_WIDTH;
+    const cfgHeight = config.canvasHeight ?? DEFAULT_CANVAS_HEIGHT;
 
-    // Resize fabric canvas to match frame dimensions
-    canvas.setDimensions({ width: targetWidth, height: targetHeight });
-    setCanvasDims({ width: targetWidth, height: targetHeight });
-
-    // Clear canvas, keep white background
     canvas.clear();
     canvas.backgroundColor = "#ffffff";
 
-    // Load background image if present
+    let targetWidth = cfgWidth;
+    let targetHeight = cfgHeight;
+
     if (config.backgroundImage) {
       const { FabricImage } = await import("fabric");
       const bg = await FabricImage.fromURL(config.backgroundImage, {
-        crossOrigin: "anonymous"
+        crossOrigin: "anonymous",
       });
-      const imgWidth = bg.width || targetWidth;
-      const imgHeight = bg.height || targetHeight;
+      targetWidth = bg.width || cfgWidth;
+      targetHeight = bg.height || cfgHeight;
 
       bg.set({
         left: 0,
         top: 0,
-        scaleX: targetWidth / imgWidth,
-        scaleY: targetHeight / imgHeight,
+        scaleX: 1,
+        scaleY: 1,
+        originX: "left",
+        originY: "top",
         selectable: false,
         evented: false,
       });
-      canvas.add(bg);
-      canvas.sendObjectToBack(bg);
+      canvas.backgroundImage = bg;
     }
 
-    // Draw photo slot placeholders
-    const { Rect, Circle, util } = await import("fabric");
+    canvas.setDimensions({ width: targetWidth, height: targetHeight });
+    setCanvasDims({ width: targetWidth, height: targetHeight });
+
+    const slotScaleX = targetWidth / cfgWidth;
+    const slotScaleY = targetHeight / cfgHeight;
+
+    const { Rect, Circle } = await import("fabric");
     for (const slot of config.photoSlots ?? []) {
+      const sx = slot.x * slotScaleX;
+      const sy = slot.y * slotScaleY;
+      const sw = slot.width * slotScaleX;
+      const sh = slot.height * slotScaleY;
       if (slot.shape === "circle") {
-        const r = Math.min(slot.width, slot.height) / 2;
+        const r = Math.min(sw, sh) / 2;
         const circle = new Circle({
-          left: slot.x,
-          top: slot.y,
+          left: sx,
+          top: sy,
           radius: r,
           fill: "rgba(200,200,200,0.3)",
           stroke: "#aaaaaa",
@@ -313,10 +320,10 @@ export default function DesignToolCanvas({
         canvas.add(circle);
       } else {
         const rect = new Rect({
-          left: slot.x,
-          top: slot.y,
-          width: slot.width,
-          height: slot.height,
+          left: sx,
+          top: sy,
+          width: sw,
+          height: sh,
           rx: slot.shape === "rounded-rect" ? 12 : 0,
           ry: slot.shape === "rounded-rect" ? 12 : 0,
           fill: "rgba(200,200,200,0.3)",
@@ -329,12 +336,10 @@ export default function DesignToolCanvas({
         });
         canvas.add(rect);
       }
-      util.loadImage; // side-effect import
     }
 
-    canvas.renderAll();
+    canvas.requestRenderAll();
     setSelectedFrame(frame);
-    // Save snapshot after frame applied
     setTimeout(saveSnapshot, 50);
   }, [saveSnapshot]);
 
@@ -542,7 +547,7 @@ export default function DesignToolCanvas({
         {/* Canvas container */}
         <div ref={containerRef} className="flex-1 min-w-0">
           <div
-            className="border border-border rounded-xl overflow-hidden bg-white shadow-sm mx-auto"
+            className="ring-1 ring-border ring-inset rounded-xl overflow-hidden bg-white shadow-sm mx-auto"
             style={{
               width: Math.round(canvasDims.width * scale),
               height: Math.round(canvasDims.height * scale),
