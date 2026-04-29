@@ -261,53 +261,49 @@ export default function DesignToolCanvas({
     if (!canvas) return;
 
     const config = frame.config as FrameConfig;
-    const cfgWidth = config.canvasWidth ?? DEFAULT_CANVAS_WIDTH;
-    const cfgHeight = config.canvasHeight ?? DEFAULT_CANVAS_HEIGHT;
+    // Strictly use 1772x1535 for the canvas area
+    const targetWidth = DEFAULT_CANVAS_WIDTH;
+    const targetHeight = DEFAULT_CANVAS_HEIGHT;
 
+    // Resize fabric canvas to match standard dimensions
+    canvas.setDimensions({ width: targetWidth, height: targetHeight });
+    setCanvasDims({ width: targetWidth, height: targetHeight });
+
+    // Clear canvas, keep white background
     canvas.clear();
     canvas.backgroundColor = "#ffffff";
 
-    let targetWidth = cfgWidth;
-    let targetHeight = cfgHeight;
-
+    // Load background image if present
     if (config.backgroundImage) {
       const { FabricImage } = await import("fabric");
       const bg = await FabricImage.fromURL(config.backgroundImage, {
-        crossOrigin: "anonymous",
+        crossOrigin: "anonymous"
       });
-      targetWidth = bg.width || cfgWidth;
-      targetHeight = bg.height || cfgHeight;
+      const imgWidth = bg.width || targetWidth;
+      const imgHeight = bg.height || targetHeight;
 
       bg.set({
         left: 0,
         top: 0,
-        scaleX: 1,
-        scaleY: 1,
         originX: "left",
         originY: "top",
+        scaleX: targetWidth / imgWidth,
+        scaleY: targetHeight / imgHeight,
         selectable: false,
         evented: false,
       });
-      canvas.backgroundImage = bg;
+      canvas.add(bg);
+      canvas.sendObjectToBack(bg);
     }
 
-    canvas.setDimensions({ width: targetWidth, height: targetHeight });
-    setCanvasDims({ width: targetWidth, height: targetHeight });
-
-    const slotScaleX = targetWidth / cfgWidth;
-    const slotScaleY = targetHeight / cfgHeight;
-
+    // Draw photo slot placeholders
     const { Rect, Circle } = await import("fabric");
     for (const slot of config.photoSlots ?? []) {
-      const sx = slot.x * slotScaleX;
-      const sy = slot.y * slotScaleY;
-      const sw = slot.width * slotScaleX;
-      const sh = slot.height * slotScaleY;
       if (slot.shape === "circle") {
-        const r = Math.min(sw, sh) / 2;
+        const r = Math.min(slot.width, slot.height) / 2;
         const circle = new Circle({
-          left: sx,
-          top: sy,
+          left: slot.x,
+          top: slot.y,
           radius: r,
           fill: "rgba(200,200,200,0.3)",
           stroke: "#aaaaaa",
@@ -320,10 +316,10 @@ export default function DesignToolCanvas({
         canvas.add(circle);
       } else {
         const rect = new Rect({
-          left: sx,
-          top: sy,
-          width: sw,
-          height: sh,
+          left: slot.x,
+          top: slot.y,
+          width: slot.width,
+          height: slot.height,
           rx: slot.shape === "rounded-rect" ? 12 : 0,
           ry: slot.shape === "rounded-rect" ? 12 : 0,
           fill: "rgba(200,200,200,0.3)",
@@ -338,8 +334,9 @@ export default function DesignToolCanvas({
       }
     }
 
-    canvas.requestRenderAll();
+    canvas.renderAll();
     setSelectedFrame(frame);
+    // Save snapshot after frame applied
     setTimeout(saveSnapshot, 50);
   }, [saveSnapshot]);
 
