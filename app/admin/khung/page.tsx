@@ -93,9 +93,9 @@ export default function AdminFramesPage() {
               className="border border-border rounded-xl overflow-hidden bg-card hover:border-primary/40 transition-colors"
             >
               <div className="relative aspect-square bg-secondary/20">
-                {frame.thumbnail_url ? (
+                {(frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage) ? (
                   <Image
-                    src={frame.thumbnail_url}
+                    src={frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage!}
                     alt={frame.name}
                     fill
                     sizes="200px"
@@ -217,6 +217,7 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
     const payload = {
       name,
       product_id: productId || null,
+      thumbnail_url: config.backgroundImage || null,
       config,
       sort_order: frame?.sort_order ?? 0,
     };

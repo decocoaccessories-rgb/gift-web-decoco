@@ -58,7 +58,7 @@ async function getFrames(productId: string) {
   const { data } = await supabase
     .from("frames")
     .select("id, name, thumbnail_url, config, sort_order")
-    .eq("product_id", productId)
+    .or(`product_id.eq.${productId},product_id.is.null`)
     .order("sort_order");
   return (data ?? []) as Pick<
     Frame,
