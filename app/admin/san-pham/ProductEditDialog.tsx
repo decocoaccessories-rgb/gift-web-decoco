@@ -53,9 +53,12 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
             : `v_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         name: "",
         image_url: images[0] ?? "",
+        stock: 0,
       },
     ]);
   }
+
+  const variantManagedStock = variants.some((v) => typeof v.stock === "number");
 
   function updateVariant(index: number, patch: Partial<ProductVariant>) {
     setVariants((prev) => prev.map((v, i) => (i === index ? { ...v, ...patch } : v)));
@@ -116,7 +119,18 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
     setError("");
 
     const cleanedVariants = variants
-      .map((v) => ({ ...v, name: v.name.trim() }))
+      .map((v) => {
+        const stockValue =
+          typeof v.stock === "number" && Number.isFinite(v.stock) && v.stock >= 0
+            ? Math.floor(v.stock)
+            : undefined;
+        return {
+          id: v.id,
+          name: v.name.trim(),
+          image_url: v.image_url,
+          ...(stockValue !== undefined ? { stock: stockValue } : {}),
+        };
+      })
       .filter((v) => v.name && v.image_url);
 
     const payload = {
@@ -196,9 +210,16 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
                 id="stock"
                 type="number"
                 min={0}
-                value={form.stock}
+                value={variantManagedStock ? "" : form.stock}
                 onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                disabled={variantManagedStock}
+                placeholder={variantManagedStock ? "Quản lý theo phân loại" : ""}
               />
+              {variantManagedStock && (
+                <p className="text-[11px] text-muted-foreground">
+                  Đã quản lý tồn kho theo phân loại bên dưới.
+                </p>
+              )}
             </div>
           </div>
 
@@ -265,13 +286,30 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
                     <select
                       value={v.image_url}
                       onChange={(e) => updateVariant(i, { image_url: e.target.value })}
-                      className="h-8 max-w-[140px] rounded-lg border border-input bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      className="h-8 max-w-[120px] rounded-lg border border-input bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
                       <option value="" disabled>Chọn ảnh</option>
                       {images.map((url, idx) => (
                         <option key={url} value={url}>Ảnh {idx + 1}</option>
                       ))}
                     </select>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={typeof v.stock === "number" ? v.stock : ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (raw === "") {
+                          updateVariant(i, { stock: undefined });
+                        } else {
+                          const n = parseInt(raw, 10);
+                          updateVariant(i, { stock: Number.isFinite(n) && n >= 0 ? n : 0 });
+                        }
+                      }}
+                      placeholder="Kho"
+                      title="Tồn kho phân loại"
+                      className="h-8 w-16"
+                    />
                     <button
                       type="button"
                       onClick={() => removeVariant(i)}

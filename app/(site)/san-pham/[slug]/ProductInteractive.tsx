@@ -42,9 +42,15 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
     return [selectedVariant.image_url, ...filtered];
   }, [product.images, selectedVariant]);
 
-  const stock = product.stock;
-  const outOfStock = stock === 0;
-  const lowStock = stock > 0 && stock <= 5;
+  const variantManagedStock = variants.some((v) => typeof v.stock === "number");
+  const effectiveStock = variantManagedStock
+    ? selectedVariant && typeof selectedVariant.stock === "number"
+      ? selectedVariant.stock
+      : null
+    : product.stock;
+  const requiresVariantSelection = variantManagedStock && !selectedVariant;
+  const outOfStock = effectiveStock === 0;
+  const lowStock = typeof effectiveStock === "number" && effectiveStock > 0 && effectiveStock <= 5;
 
   return (
     <>
@@ -65,13 +71,17 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
           </div>
 
           {/* Stock status */}
-          {outOfStock ? (
+          {requiresVariantSelection ? (
+            <p className="text-sm text-muted-foreground">
+              Chọn phân loại để xem tồn kho
+            </p>
+          ) : outOfStock ? (
             <Badge variant="secondary" className="text-sm">
               Hết hàng
             </Badge>
           ) : lowStock ? (
             <p className="text-sm font-medium text-destructive">
-              Chỉ còn {stock} sản phẩm!
+              Chỉ còn {effectiveStock} sản phẩm!
             </p>
           ) : (
             <p className="text-sm text-muted-foreground">Còn hàng</p>

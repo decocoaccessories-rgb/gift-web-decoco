@@ -6,6 +6,7 @@ const variantSchema = z.object({
   id: z.string().min(1).max(64),
   name: z.string().min(1).max(100),
   image_url: z.string().url(),
+  stock: z.number().int().min(0).optional(),
 });
 
 const createSchema = z.object({

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { generateOrderNumber } from "@/lib/utils";
-import type { Product } from "@/lib/supabase/types";
+import type { Product, ProductVariant } from "@/lib/supabase/types";
 
 // Simple in-memory rate limiter: 5 POST requests per IP per minute
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -58,11 +58,11 @@ export async function POST(request: NextRequest) {
 
   const { data: rawProduct, error: productError } = await supabase
     .from("products")
-    .select("id, price, stock, is_visible, name")
+    .select("id, price, stock, is_visible, name, variants")
     .eq("id", data.product_id)
     .single();
 
-  const product = rawProduct as Pick<Product, "id" | "price" | "stock" | "is_visible" | "name"> | null;
+  const product = rawProduct as Pick<Product, "id" | "price" | "stock" | "is_visible" | "name" | "variants"> | null;
 
   if (productError || !product) {
     return NextResponse.json({ error: "Sản phẩm không tồn tại" }, { status: 404 });
@@ -70,7 +70,26 @@ export async function POST(request: NextRequest) {
   if (!product.is_visible) {
     return NextResponse.json({ error: "Sản phẩm không còn kinh doanh" }, { status: 410 });
   }
-  if (product.stock <= 0) {
+
+  const variants = (product.variants ?? []) as ProductVariant[];
+  const productManagesByVariant = variants.some((v) => typeof v.stock === "number");
+  const matchingVariant = data.variant_name
+    ? variants.find((v) => v.name === data.variant_name) ?? null
+    : null;
+  const useVariantStock = matchingVariant != null && typeof matchingVariant.stock === "number";
+
+  if (productManagesByVariant && !useVariantStock) {
+    return NextResponse.json(
+      { error: "Vui lòng chọn phân loại trước khi đặt hàng" },
+      { status: 400 }
+    );
+  }
+
+  if (useVariantStock) {
+    if ((matchingVariant!.stock ?? 0) <= 0) {
+      return NextResponse.json({ error: "Phân loại đã hết hàng" }, { status: 409 });
+    }
+  } else if (product.stock <= 0) {
     return NextResponse.json({ error: "Sản phẩm đã hết hàng" }, { status: 409 });
   }
 
@@ -102,10 +121,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Không thể tạo đơn hàng" }, { status: 500 });
   }
 
-  await supabase
-    .from("products")
-    .update({ stock: product.stock - 1 })
-    .eq("id", data.product_id);
+  if (useVariantStock) {
+    const { error: rpcError } = await supabase.rpc("decrement_variant_stock", {
+      p_product_id: data.product_id,
+      p_variant_id: matchingVariant!.id,
+    });
+    if (rpcError) {
+      console.error("Variant stock decrement failed:", rpcError);
+    }
+  } else {
+    await supabase
+      .from("products")
+      .update({ stock: product.stock - 1 })
+      .eq("id", data.product_id);
+  }
 
   return NextResponse.json(
     { orderId: order.id, orderNumber: order.order_number },

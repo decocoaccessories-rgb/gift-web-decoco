@@ -30,6 +30,7 @@ export interface ProductVariant {
   id: string;
   name: string;
   image_url: string;
+  stock?: number;
 }
 
 export interface Database {
