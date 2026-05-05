@@ -78,7 +78,7 @@ export default function HeroSection({ content }: HeroSectionProps) {
           <>
             <Link
               href="/san-pham"
-              className={cn(buttonVariants({ size: "lg" }), "rounded-full px-8 bg-white text-foreground hover:bg-white/90")}
+              className={cn(buttonVariants({ size: "lg" }), "rounded-full px-8 bg-white text-foreground hover:bg-white/90!")}
             >
               Khám phá quà tặng
             </Link>
@@ -86,7 +86,7 @@ export default function HeroSection({ content }: HeroSectionProps) {
               href="/#story"
               className={cn(
                 buttonVariants({ size: "lg", variant: "outline" }),
-                "rounded-full px-8 border-white text-white hover:bg-white/10 hover:text-white"
+                "rounded-full px-8 bg-transparent border-white text-white hover:bg-white/10 hover:text-white"
               )}
             >
               Tìm hiểu thêm
