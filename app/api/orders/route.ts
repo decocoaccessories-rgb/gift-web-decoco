@@ -3,7 +3,8 @@ import { z } from "zod";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { generateOrderNumber } from "@/lib/utils";
 import { buildVnpayPaymentUrl } from "@/lib/vnpay";
-import type { Product, ProductVariant } from "@/lib/supabase/types";
+import { sendNewOrderEmail } from "@/lib/email";
+import type { Order, Product, ProductVariant } from "@/lib/supabase/types";
 
 // Simple in-memory rate limiter: 5 POST requests per IP per minute
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -120,13 +121,19 @@ export async function POST(request: NextRequest) {
       payment_status: "pending",
       vnp_txn_ref: txnRef,
     })
-    .select("id, order_number")
+    .select("id, order_number, customer_name, customer_phone, customer_email, province, address, note, price_at_order, variant_name, design_image_url, payment_method, payment_status, created_at")
     .single();
 
   if (insertError || !order) {
     console.error("Insert order error:", insertError);
     return NextResponse.json({ error: "Không thể tạo đơn hàng" }, { status: 500 });
   }
+
+  // Fire-and-await email notification (fail-soft).
+  await sendNewOrderEmail({
+    order: order as unknown as Order,
+    product: { name: product.name },
+  });
 
   if (isVnpay) {
     let paymentUrl: string;

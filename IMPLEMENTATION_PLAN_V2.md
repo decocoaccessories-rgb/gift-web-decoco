@@ -57,18 +57,18 @@
 
 ## Phase 3 — Email thông báo đơn
 
-- [ ] Tạo `lib/email/index.ts`:
-  - [ ] Init `new Resend(process.env.RESEND_API_KEY)`
-  - [ ] Guard: nếu API key thiếu hoặc là `placeholder_resend_key` → log warning + return
-  - [ ] Export `sendNewOrderEmail(order)` — try/catch, gọi `resend.emails.send`
-- [ ] Tạo `lib/email/templates/new-order.ts`:
-  - [ ] Function `renderNewOrderEmail(order)` → return `{ subject, html }`
-  - [ ] Subject: `[DECOCO] Đơn mới #${order_number} — ${customer_name}`
-  - [ ] HTML table tiếng Việt với order_number, khách hàng, SĐT, địa chỉ, sản phẩm, variant, giá, payment_method/status, link design, link admin
-- [ ] Hook vào `app/api/orders/route.ts`:
-  - [ ] Sau khi insert order thành công → `sendNewOrderEmail(order).catch(err => console.error(...))` (await không block lỗi)
-- [ ] **Test phase 3**: tạo đơn (COD) → check inbox `decoco.cskh@gmail.com` (kiểm cả Spam vì from `onboarding@resend.dev`); set `RESEND_API_KEY=placeholder_resend_key` → đặt đơn vẫn thành công, log warning
-- [ ] Commit `feat: order notification email via resend` + push
+- [x] Tạo `lib/email/index.ts`:
+  - [x] Lazy Resend client với guard cho placeholder key (`placeholder_resend_key` hoặc bắt đầu `re_your-`)
+  - [x] Export `sendNewOrderEmail({ order, product })` — try/catch ở 2 layer, không throw
+- [x] Tạo `lib/email/templates/new-order.ts`:
+  - [x] `renderNewOrderEmail(data)` → `{ subject, html }`
+  - [x] Subject: `[DECOCO] Đơn mới #${order_number} — ${customer_name}`
+  - [x] HTML table tiếng Việt với order_number, khách hàng, SĐT, email, tỉnh, địa chỉ, ghi chú, sản phẩm, phân loại, giá, payment_method, payment_status, link ảnh design, nút "Xem trong Admin"
+  - [x] HTML escape mọi user input
+- [x] Hook vào `app/api/orders/route.ts` — gọi `sendNewOrderEmail` sau insert thành công với select mở rộng (full email-needed columns)
+- [x] Build pass
+- [ ] **Test phase 3 trên Vercel preview**: tạo đơn COD → check inbox `decoco.cskh@gmail.com` (cả Spam vì from `onboarding@resend.dev`); với key placeholder → đặt đơn vẫn thành công, log warning
+- [x] Commit `feat: order notification email via resend` + push
 
 ## Phase 4 — QA & Deploy
 
