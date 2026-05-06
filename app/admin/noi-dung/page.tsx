@@ -14,6 +14,7 @@ const SECTION_LABELS: Record<string, string> = {
   story: "Giới thiệu (Story)",
   cta: "CTA",
   footer: "Footer",
+  policy: "Chính sách & Điều khoản",
 };
 
 const IMAGE_HINTS: Record<string, string> = {

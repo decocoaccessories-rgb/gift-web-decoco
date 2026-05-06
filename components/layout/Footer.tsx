@@ -141,15 +141,15 @@ export default async function Footer() {
         <div className="mt-10 pt-6 border-t border-background/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-background/40">
           <p>© {new Date().getFullYear()} DECOCO. All rights reserved.</p>
           <div className="flex gap-4">
-            <span className="hover:text-background/60 cursor-pointer transition-colors">
+            <Link href="/chinh-sach/chinh-sach-bao-mat" className="hover:text-background/60 transition-colors">
               Chính sách bảo mật
-            </span>
-            <span className="hover:text-background/60 cursor-pointer transition-colors">
+            </Link>
+            <Link href="/chinh-sach/dieu-khoan-su-dung" className="hover:text-background/60 transition-colors">
               Điều khoản sử dụng
-            </span>
-            <span className="hover:text-background/60 cursor-pointer transition-colors">
+            </Link>
+            <Link href="/chinh-sach/doi-tra" className="hover:text-background/60 transition-colors">
               Đổi trả
-            </span>
+            </Link>
           </div>
         </div>
       </div>
