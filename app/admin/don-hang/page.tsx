@@ -41,8 +41,26 @@ type OrderRow = Pick<
   | "price_at_order"
   | "design_image_url"
   | "variant_name"
+  | "payment_method"
+  | "payment_status"
+  | "paid_at"
   | "created_at"
 >;
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  cod: "COD",
+  vnpay: "VNPAY",
+};
+
+const PAYMENT_STATUS_LABEL: Record<
+  string,
+  { label: string; className: string }
+> = {
+  pending: { label: "Chờ", className: "bg-amber-100 text-amber-800" },
+  paid: { label: "Đã trả", className: "bg-emerald-100 text-emerald-800" },
+  failed: { label: "Lỗi", className: "bg-red-100 text-red-800" },
+  cancelled: { label: "Huỷ", className: "bg-zinc-100 text-zinc-700" },
+};
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
@@ -152,6 +170,7 @@ export default function AdminOrdersPage() {
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Thời gian</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Khách hàng</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Giá trị</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Thanh toán</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Thiết kế</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Trạng thái</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground whitespace-nowrap">Actions</th>
@@ -160,7 +179,7 @@ export default function AdminOrdersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={8} className="text-center py-12 text-muted-foreground">
                     <div className="flex justify-center">
                       <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     </div>
@@ -168,7 +187,7 @@ export default function AdminOrdersPage() {
                 </tr>
               ) : orders.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted-foreground italic">
+                  <td colSpan={8} className="text-center py-12 text-muted-foreground italic">
                     Không có đơn hàng nào
                   </td>
                 </tr>
@@ -185,6 +204,24 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="px-4 py-3 font-semibold text-primary whitespace-nowrap">
                         {formatPrice(order.price_at_order)}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-xs font-medium">
+                            {PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method}
+                          </span>
+                          {(() => {
+                            const ps = PAYMENT_STATUS_LABEL[order.payment_status] ?? {
+                              label: order.payment_status,
+                              className: "bg-zinc-100 text-zinc-700",
+                            };
+                            return (
+                              <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded ${ps.className} w-fit`}>
+                                {ps.label}
+                              </span>
+                            );
+                          })()}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         {order.design_image_url ? (

@@ -28,48 +28,32 @@
 
 ## Phase 2 — VNPAY QR payment
 
-- [ ] Tạo migration `supabase/migrations/006_add_payment_fields.sql`:
-  - `payment_method TEXT NOT NULL DEFAULT 'cod' CHECK IN ('cod','vnpay')`
-  - `payment_status TEXT NOT NULL DEFAULT 'pending' CHECK IN ('pending','paid','failed','cancelled')`
-  - `vnp_txn_ref TEXT UNIQUE`, `vnp_transaction_no TEXT`, `paid_at TIMESTAMPTZ`
-  - Index `orders_vnp_txn_ref_idx`
-- [ ] Apply migration lên Supabase
-- [ ] `lib/supabase/types.ts` — Order type thêm các field mới
-- [ ] Tạo `lib/vnpay.ts`:
-  - [ ] `getVnpayClient()` — singleton với `tmnCode`, `secureSecret`, `vnpayHost`, `testMode`
-  - [ ] `buildVnpayPaymentUrl({ orderNumber, amount, ipAddr, orderInfo })` — return `{ url, txnRef }`
-  - [ ] `verifyVnpayReturn(query)` — return `{ isValid, orderId?, status }`
-  - [ ] `verifyVnpayIpn(query)` — return `{ isValid, txnRef, transactionNo, amount, status }`
-- [ ] Sửa `app/api/orders/route.ts`:
-  - [ ] Zod schema thêm `payment_method: z.enum(['cod','vnpay']).default('cod')`
-  - [ ] Sau insert order: if `payment_method === 'vnpay'` → KHÔNG decrement stock; build `vnp_TxnRef = ${orderNumber}-${Date.now().toString(36)}`, update order với `vnp_txn_ref`, gọi `buildVnpayPaymentUrl`, return `{ orderId, orderNumber, paymentUrl }`. Else giữ flow COD cũ.
-- [ ] Tạo `app/api/payments/vnpay/return/route.ts` (GET):
-  - [ ] `verifyVnpayReturn(searchParams)` → redirect `/cam-on?id=${orderId}&num=${orderNumber}&pay=${success|failed|invalid}`
-  - [ ] KHÔNG sửa DB ở đây
-- [ ] Tạo `app/api/payments/vnpay/ipn/route.ts` (GET):
-  - [ ] `verifyVnpayIpn(searchParams)` → nếu invalid trả `{ RspCode: '97', Message: 'Invalid signature' }`
-  - [ ] Lookup order theo `vnp_txn_ref` → nếu không thấy trả `{ RspCode: '01', Message: 'Order not found' }`
-  - [ ] Nếu `payment_status === 'paid'` rồi → trả `{ RspCode: '02', Message: 'Order already confirmed' }` (idempotent)
-  - [ ] Verify amount khớp `price_at_order * 100` → mismatch trả `{ RspCode: '04', Message: 'Invalid amount' }`
-  - [ ] Update `payment_status='paid', vnp_transaction_no, paid_at=now()`, gọi RPC decrement variant stock (hoặc product.stock fallback) → trả `{ RspCode: '00', Message: 'Confirm Success' }`
-- [ ] Sửa `app/(site)/dat-hang/page.tsx`:
-  - [ ] Thêm `<RadioGroup>` chọn `cod | vnpay` (default cod)
-  - [ ] Submit gửi `payment_method`. Nếu response có `paymentUrl` → `window.location.href = paymentUrl`
-- [ ] Sửa `app/(site)/cam-on/page.tsx`:
-  - [ ] Đọc `?pay=` query param
-  - [ ] Banner xanh nếu `success`, đỏ nếu `failed/invalid`, neutral nếu undefined (COD)
-  - [ ] Với VNPAY success: hiện thêm "Chúng tôi đang xác nhận giao dịch — bạn sẽ nhận email khi hoàn tất"
-- [ ] Sửa admin order list/dialog (`app/admin/don-hang/`):
-  - [ ] Cột mới `payment_method` (badge: COD/VNPAY)
-  - [ ] Cột mới `payment_status` (pending/paid/failed/cancelled, màu khác nhau)
-  - [ ] `payment_status` read-only trong dialog
+- [x] Tạo migration `supabase/migrations/006_add_payment_fields.sql` (+ apply lên Supabase via MCP)
+- [x] `lib/supabase/types.ts` — Order type thêm `payment_method`, `payment_status`, `vnp_txn_ref`, `vnp_transaction_no`, `paid_at`
+- [x] `npm i vnpay` (v2.5.0)
+- [x] Tạo `lib/vnpay.ts`:
+  - [x] `getVnpayClient()` singleton với SHA512 + sandbox auto-detect
+  - [x] `buildVnpayPaymentUrl({ txnRef, amount, ipAddr, orderInfo })`
+  - [x] `verifyVnpayReturn(query)` và `verifyVnpayIpn(query)`
+  - [x] Re-export `IpnSuccess/IpnOrderNotFound/InpOrderAlreadyConfirmed/IpnInvalidAmount/IpnFailChecksum/IpnUnknownError`
+- [x] Update `.env.local.example` thêm `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_HOST`, `VNPAY_RETURN_PATH`, `RESEND_FROM_EMAIL`, `NOTIFICATION_EMAIL`
+- [x] Sửa `app/api/orders/route.ts`:
+  - [x] Zod schema thêm `payment_method: z.enum(['cod','vnpay']).default('cod')`
+  - [x] VNPAY: KHÔNG decrement stock; build txnRef = `${orderNumber}-${base36(now)}`; build payment URL; return `{ orderId, orderNumber, paymentUrl }`. Rollback order khi build URL fail.
+- [x] Tạo `app/api/payments/vnpay/return/route.ts` (GET) — verify + redirect `/cam-on?pay=...`, không sửa DB
+- [x] Tạo `app/api/payments/vnpay/ipn/route.ts` (GET) — verify + idempotent + amount check + flip paid + decrement stock; trả VNPAY-format response
+- [x] Sửa `app/(site)/dat-hang/page.tsx`: radio COD/VNPAY, redirect khi nhận `paymentUrl`, label nút submit động
+- [x] Sửa `app/(site)/cam-on/page.tsx`: banner theo `?pay=success|failed|invalid` (mặc định COD)
+- [x] Sửa admin order list + dialog: cột "Thanh toán" (method + status badge), dialog show payment_method/status/paid_at
+- [x] Build pass (`npm run build`)
 - [ ] **Test phase 2 trên Vercel preview** (IPN không reach localhost):
-  - [ ] Set env vars VNPAY trên Vercel preview env
+  - [ ] Set env vars VNPAY trên Vercel preview env: `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_HOST`, `VNPAY_RETURN_PATH`, `NEXT_PUBLIC_APP_URL` (preview URL)
+  - [ ] **Quan trọng**: cấu hình IPN URL trên VNPAY merchant portal trỏ tới `${preview-url}/api/payments/vnpay/ipn`
   - [ ] Đặt đơn VNPAY → redirect sandbox.vnpayment.vn → thẻ NCB `9704198526463749517` OTP `123456`
   - [ ] Verify return về `/cam-on?pay=success`
   - [ ] Verify Vercel logs có IPN call → DB cập nhật `payment_status='paid'`, kho giảm
   - [ ] Test fail: cancel ở gateway → `?pay=failed`, kho không giảm
-- [ ] Commit `feat: vnpay qr payment integration` + push
+- [x] Commit `feat: vnpay qr payment integration` + push
 
 ## Phase 3 — Email thông báo đơn
 

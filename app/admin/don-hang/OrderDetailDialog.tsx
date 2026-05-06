@@ -20,8 +20,23 @@ type OrderRow = Pick<
   | "price_at_order"
   | "design_image_url"
   | "variant_name"
+  | "payment_method"
+  | "payment_status"
+  | "paid_at"
   | "created_at"
 >;
+
+const PAYMENT_METHOD_LABEL: Record<string, string> = {
+  cod: "COD — Thanh toán khi nhận",
+  vnpay: "VNPAY",
+};
+
+const PAYMENT_STATUS_LABEL: Record<string, string> = {
+  pending: "Chờ thanh toán",
+  paid: "Đã thanh toán",
+  failed: "Thất bại",
+  cancelled: "Đã huỷ",
+};
 
 const STATUS_LABELS: Record<string, string> = {
   new: "Mới",
@@ -134,8 +149,17 @@ export default function OrderDetailDialog({ order, onClose }: Props) {
               <dd className="font-semibold text-primary">{formatPrice(order.price_at_order)}</dd>
               <dt className="text-muted-foreground">Trạng thái</dt>
               <dd>{STATUS_LABELS[order.status] ?? order.status}</dd>
-              <dt className="text-muted-foreground">Thanh toán</dt>
-              <dd>COD — Thanh toán khi nhận</dd>
+              <dt className="text-muted-foreground">Phương thức TT</dt>
+              <dd>{PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method}</dd>
+              <dt className="text-muted-foreground">TT trạng thái</dt>
+              <dd>
+                {PAYMENT_STATUS_LABEL[order.payment_status] ?? order.payment_status}
+                {order.paid_at && (
+                  <span className="text-xs text-muted-foreground ml-2">
+                    ({new Date(order.paid_at).toLocaleString("vi-VN")})
+                  </span>
+                )}
+              </dd>
             </dl>
           </div>
         </div>

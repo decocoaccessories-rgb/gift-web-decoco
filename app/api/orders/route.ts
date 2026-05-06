@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { generateOrderNumber } from "@/lib/utils";
+import { buildVnpayPaymentUrl } from "@/lib/vnpay";
 import type { Product, ProductVariant } from "@/lib/supabase/types";
 
 // Simple in-memory rate limiter: 5 POST requests per IP per minute
@@ -24,6 +25,7 @@ const orderSchema = z.object({
   design_image_url: z.string().url().optional(),
   design_data: z.record(z.string(), z.unknown()).optional(),
   variant_name: z.string().max(100).nullable().optional(),
+  payment_method: z.enum(["cod", "vnpay"]).default("cod"),
   customer_name: z.string().min(2).max(100),
   customer_phone: z
     .string()
@@ -94,6 +96,8 @@ export async function POST(request: NextRequest) {
   }
 
   const orderNumber = generateOrderNumber();
+  const isVnpay = data.payment_method === "vnpay";
+  const txnRef = isVnpay ? `${orderNumber}-${Date.now().toString(36)}` : null;
 
   const { data: order, error: insertError } = await supabase
     .from("orders")
@@ -112,6 +116,9 @@ export async function POST(request: NextRequest) {
       note: data.note ?? null,
       price_at_order: product.price,
       status: "new",
+      payment_method: data.payment_method,
+      payment_status: "pending",
+      vnp_txn_ref: txnRef,
     })
     .select("id, order_number")
     .single();
@@ -119,6 +126,30 @@ export async function POST(request: NextRequest) {
   if (insertError || !order) {
     console.error("Insert order error:", insertError);
     return NextResponse.json({ error: "Không thể tạo đơn hàng" }, { status: 500 });
+  }
+
+  if (isVnpay) {
+    let paymentUrl: string;
+    try {
+      paymentUrl = buildVnpayPaymentUrl({
+        txnRef: txnRef!,
+        amount: product.price,
+        ipAddr: ip === "unknown" ? "127.0.0.1" : ip,
+        orderInfo: `Thanh toan don hang ${orderNumber}`,
+      });
+    } catch (err) {
+      console.error("VNPAY build URL failed:", err);
+      await supabase.from("orders").delete().eq("id", order.id);
+      return NextResponse.json(
+        { error: "Cổng thanh toán chưa cấu hình. Vui lòng chọn COD." },
+        { status: 503 }
+      );
+    }
+
+    return NextResponse.json(
+      { orderId: order.id, orderNumber: order.order_number, paymentUrl },
+      { status: 201 }
+    );
   }
 
   if (useVariantStock) {
@@ -158,7 +189,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   let query = admin
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_email, province, address, note, status, price_at_order, design_image_url, variant_name, created_at, product_id", { count: "exact" })
+    .select("id, order_number, customer_name, customer_phone, customer_email, province, address, note, status, price_at_order, design_image_url, variant_name, payment_method, payment_status, paid_at, created_at, product_id", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

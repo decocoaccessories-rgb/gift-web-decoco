@@ -44,6 +44,7 @@ export default function CheckoutPage() {
   const [designInfo, setDesignInfo] = useState<DesignInfo | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay">("cod");
 
   const {
     register,
@@ -83,6 +84,7 @@ export default function CheckoutPage() {
             ? JSON.parse(designInfo.canvasJSON)
             : undefined,
           variant_name: designInfo.variantName ?? null,
+          payment_method: paymentMethod,
           ...values,
         }),
       });
@@ -99,6 +101,12 @@ export default function CheckoutPage() {
       }
 
       sessionStorage.removeItem("decoco_design");
+
+      if (data.paymentUrl) {
+        window.location.href = data.paymentUrl as string;
+        return;
+      }
+
       router.push(`/cam-on?id=${data.orderId}&num=${data.orderNumber}`);
     } catch {
       setServerError("Lỗi kết nối. Vui lòng kiểm tra mạng và thử lại.");
@@ -238,6 +246,45 @@ export default function CheckoutPage() {
               />
             </div>
 
+            {/* Payment method */}
+            <div className="space-y-2">
+              <Label>Phương thức thanh toán *</Label>
+              <div className="grid gap-2">
+                <label className="flex items-start gap-3 rounded-lg border border-input p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    value="cod"
+                    checked={paymentMethod === "cod"}
+                    onChange={() => setPaymentMethod("cod")}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Thanh toán khi nhận hàng (COD)</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Nhân viên sẽ xác nhận đơn trước khi giao.
+                    </p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 rounded-lg border border-input p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    value="vnpay"
+                    checked={paymentMethod === "vnpay"}
+                    onChange={() => setPaymentMethod("vnpay")}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">VNPAY (QR / ATM / Visa)</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Chuyển sang cổng VNPAY để thanh toán an toàn.
+                    </p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
             {serverError && (
               <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-4 py-3">
                 {serverError}
@@ -250,7 +297,11 @@ export default function CheckoutPage() {
               className="w-full"
               disabled={submitting}
             >
-              {submitting ? "Đang đặt hàng..." : "Đặt hàng — Thanh toán khi nhận hàng"}
+              {submitting
+                ? "Đang xử lý..."
+                : paymentMethod === "vnpay"
+                ? "Đặt hàng — Thanh toán VNPAY"
+                : "Đặt hàng — Thanh toán khi nhận hàng"}
             </Button>
 
             <p className="text-xs text-muted-foreground text-center">
@@ -306,7 +357,9 @@ export default function CheckoutPage() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground bg-secondary/40 rounded-md px-3 py-2">
-                  💳 Thanh toán khi nhận hàng (COD)
+                  {paymentMethod === "vnpay"
+                    ? "Thanh toán qua VNPAY (QR / ATM / Visa)"
+                    : "Thanh toán khi nhận hàng (COD)"}
                 </p>
               </>
             ) : (
