@@ -23,24 +23,31 @@ export default function ProductCard({ product }: ProductCardProps) {
   useEffect(() => {
     const el = cardRef.current;
     if (!el || !hoverImage || hoverImage === primaryImage) return;
+    const SWAP_MS = 1800;
+    let intervalId: number | null = null;
+    const startCycle = () => {
+      if (intervalId !== null) return;
+      intervalId = window.setInterval(() => {
+        setShowSecond((prev) => !prev);
+      }, SWAP_MS);
+    };
+    const stopCycle = () => {
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
     const observer = new IntersectionObserver(
       (entries) => {
-        if (!entries[0]?.isIntersecting) return;
-        observer.disconnect();
-        const inTimer = window.setTimeout(() => setShowSecond(true), 400);
-        const outTimer = window.setTimeout(() => setShowSecond(false), 1800);
-        cleanupTimers = () => {
-          window.clearTimeout(inTimer);
-          window.clearTimeout(outTimer);
-        };
+        if (entries[0]?.isIntersecting) startCycle();
+        else stopCycle();
       },
       { threshold: 0.5 }
     );
-    let cleanupTimers: (() => void) | null = null;
     observer.observe(el);
     return () => {
       observer.disconnect();
-      cleanupTimers?.();
+      stopCycle();
     };
   }, [hoverImage, primaryImage]);
 

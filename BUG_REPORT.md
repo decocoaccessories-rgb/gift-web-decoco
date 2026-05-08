@@ -1,7 +1,33 @@
 # Bug Report
 
 ## Status
-THÀNH CÔNG (Option C: auto-cycle qua IntersectionObserver)
+THÀNH CÔNG (Hotfix #C2: continuous alternating loop while in viewport)
+
+## [Hotfix #C2] User feedback
+- **User report**: "ảnh 2 chỉ hiện 1 lúc rồi quay lại ảnh 1 và dừng. Muốn lặp lại liên tục: ảnh 1 → ảnh 2 → ảnh 1 → ảnh 2 …"
+- **Phân tích**: Code C1 dùng 2 `setTimeout` one-shot rồi `observer.disconnect()` → chỉ chạy 1 vòng.
+- **Fix**: thay 2 setTimeout bằng `setInterval` toggle `showSecond` mỗi ~1800ms. Giữ observer luôn observe (không disconnect) để pause cycle khi card rời viewport (tiết kiệm pin), resume khi vào lại. Cleanup interval + observer khi unmount.
+
+### Test Results (C2)
+- `npm run build` → ✓ Compiled successfully + 27/27 pages OK.
+- Static verification 10/10 pass:
+  ```
+  PASS  Uses setInterval for continuous loop
+  PASS  No more one-shot setTimeout(setShowSecond(true))
+  PASS  Toggles showSecond via prev callback
+  PASS  SWAP_MS = 1800
+  PASS  startCycle defined
+  PASS  stopCycle defined
+  PASS  Observer pauses on leave viewport (else stopCycle)
+  PASS  Cleanup disconnects observer + stops cycle
+  PASS  Skips when only one image
+  PASS  No more disconnect inside intersection callback
+  ```
+
+### Verification trên iPhone (sau Vercel deploy)
+- Cuộn xuống "Sản phẩm nổi bật" → mỗi card hiện ảnh 1 (1.8s) → fade ảnh 2 (1.8s) → fade ảnh 1 (1.8s) → ... lặp vô tận khi card còn trong viewport.
+- Cuộn card ra khỏi viewport → cycle dừng (tiết kiệm pin). Cuộn lại → cycle tiếp tục (giữ trạng thái cuối cùng).
+- Desktop hover → CSS hover vẫn override interval state.
 
 ## Bug Title
 Trên mobile, ảnh thứ 2 của sản phẩm không hiện khi chạm vào card ở Section "Sản phẩm nổi bật".
