@@ -29,7 +29,6 @@ interface TextPropsPanelProps {
 
 export default function TextPropsPanel({ fabricRef }: TextPropsPanelProps) {
   const [fontFamily, setFontFamily] = useState("Be Vietnam Pro");
-  const [fontSize, setFontSize] = useState(32);
   const [fill, setFill] = useState("#000000");
   const [bold, setBold] = useState(false);
   const [italic, setItalic] = useState(false);
@@ -41,7 +40,6 @@ export default function TextPropsPanel({ fabricRef }: TextPropsPanelProps) {
     const obj = canvas.getActiveObject() as IText | null;
     if (!obj) return;
     if (obj.fontFamily) setFontFamily(obj.fontFamily);
-    if (obj.fontSize) setFontSize(obj.fontSize);
     if (typeof obj.fill === "string") setFill(obj.fill);
     setBold(obj.fontWeight === "bold");
     setItalic(obj.fontStyle === "italic");
@@ -91,23 +89,6 @@ export default function TextPropsPanel({ fabricRef }: TextPropsPanelProps) {
               </option>
             ))}
           </select>
-        </div>
-
-        {/* Font size */}
-        <div className="space-y-1">
-          <label className="text-xs text-muted-foreground">Cỡ</label>
-          <input
-            type="number"
-            min={8}
-            max={120}
-            value={fontSize}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              setFontSize(v);
-              applyProp({ fontSize: v });
-            }}
-            className="h-7 w-16 rounded-md border border-input bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
         </div>
 
         {/* Bold / Italic */}
