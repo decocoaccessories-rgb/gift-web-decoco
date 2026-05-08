@@ -71,9 +71,17 @@ export default function TextPropsPanel({ fabricRef }: TextPropsPanelProps) {
           <label className="text-xs text-muted-foreground">Font</label>
           <select
             value={fontFamily}
-            onChange={(e) => {
-              setFontFamily(e.target.value);
-              applyProp({ fontFamily: e.target.value });
+            onChange={async (e) => {
+              const next = e.target.value;
+              setFontFamily(next);
+              if (typeof document !== "undefined" && "fonts" in document) {
+                try {
+                  await document.fonts.load(`16px "${next}"`);
+                } catch {
+                  // Font failed to load — Fabric will fall back; user can retry
+                }
+              }
+              applyProp({ fontFamily: next });
             }}
             className="h-7 rounded-md border border-input bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >

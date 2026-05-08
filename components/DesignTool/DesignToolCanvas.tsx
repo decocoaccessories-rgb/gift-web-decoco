@@ -210,7 +210,9 @@ export default function DesignToolCanvas({
 
       // Track selection
       canvas.on("selection:created", (e) => {
-        const obj = e.selected?.[0];
+        const obj = e.selected?.[0] as unknown as
+          | { type?: string; set: (p: object) => void; controls?: Record<string, { sizeX: number; sizeY: number }> }
+          | undefined;
         setHasSelection(true);
         setSelectedType(
           obj?.type === "i-text" || obj?.type === "text"
@@ -219,6 +221,21 @@ export default function DesignToolCanvas({
             ? "image"
             : "other"
         );
+        // Defensive: re-apply scale-compensated control sizes on the freshly
+        // selected object — covers the race when an object was added before
+        // the ResizeObserver computed the actual scale.
+        if (obj && typeof obj.set === "function") {
+          const inv = 1 / Math.max(scaleRef.current, 0.05);
+          const cornerSize = Math.round(16 * inv);
+          obj.set({ cornerSize, touchCornerSize: cornerSize, borderScaleFactor: Math.max(2, Math.round(2 * inv)) });
+          if (obj.controls) {
+            Object.values(obj.controls).forEach((c) => {
+              c.sizeX = cornerSize;
+              c.sizeY = cornerSize;
+            });
+          }
+          canvas.requestRenderAll();
+        }
       });
       canvas.on("selection:updated", (e) => {
         const obj = e.selected?.[0];

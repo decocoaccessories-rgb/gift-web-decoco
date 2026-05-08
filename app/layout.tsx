@@ -56,6 +56,15 @@ export default function RootLayout({
       lang="vi"
       className={`${beVietnamPro.variable} ${playfairDisplay.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {/* Design-tool fonts (used by canvas IText, listed in TextPropsPanel) */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Dancing+Script&family=Great+Vibes&family=Lobster&family=Montserrat:wght@400;700&family=Nunito:wght@400;700&family=Oswald&family=Pacifico&family=Raleway:wght@400;700&display=swap"
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         {children}
         <Toaster richColors position="top-right" />

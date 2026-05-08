@@ -1,96 +1,88 @@
 # Báo cáo Lỗi
 ## Trạng thái
-THÀNH CÔNG (Đã sửa shifting + dots robust)
+THÀNH CÔNG (Bổ sung 8 font + defensive dots reapply)
 
 ## Tiêu đề Lỗi
-[NGHIÊM TRỌNG] 4 chấm tròn vẫn mất và màn hình bị dịch chuyển khi sửa chữ.
+[TIẾP TỤC] 4 chấm tròn vẫn mất, màn hình dịch chuyển và lỗi không đổi Font chữ.
 
 ## Mô tả Lỗi
 1. **4 Chấm tròn**: Vẫn chưa hiển thị màu burgundy ở 4 góc đối tượng.
-2. **Dịch chuyển màn hình (Shifting)**: 
-   - Sau khi fix font-size 16px, hiện tượng Zoom đã hết.
-   - Tuy nhiên, khi click sửa chữ, toàn bộ trang web bị đẩy lên trên (scroll up) quá mức, khiến khu vực canvas bị khuất khỏi màn hình, chỉ còn thấy phần trắng hoặc footer.
-   - Khi bàn phím hiện lên, người dùng không còn nhìn thấy vùng mình đang sửa.
+2. **Dịch chuyển màn hình (Shifting)**: Khi click sửa chữ, trang web bị cuộn lên làm mất dấu canvas.
+3. **Lỗi Font chữ**:
+   - Các font từ vị trí thứ 4 (`Pacifico`) trở xuống trong danh sách không có tác dụng khi chọn.
+   - Chỉ có 3 font đầu tiên có sự thay đổi (thực tế có thể chỉ 2 font hệ thống đã load).
 
 ## Các bước tái hiện
-1. Truy cập Trang sản phẩm trên iPhone.
-2. Thêm đối tượng chữ.
-3. Chạm vào chữ để sửa.
-4. **Kết quả**: Bàn phím hiện lên, trang web tự động cuộn lên trên làm mất dấu vùng canvas.
+1. Truy cập Trang sản phẩm -> Thêm chữ.
+2. Mở danh sách Font trong phần Thuộc tính chữ.
+3. Chọn các font như `Pacifico`, `Montserrat`, `Raleway`...
+4. **Kết quả**: Chữ trên canvas không thay đổi kiểu dáng, giữ nguyên font mặc định.
 
 ## Kết quả Thực tế vs Kết quả Mong đợi
-- **Thực tế**: Trang bị cuộn (shift) làm mất vùng thiết kế.
-- **Mong đợi**: Màn hình giữ nguyên hoặc chỉ cuộn nhẹ để vừa đủ thấy vùng đang nhập liệu, không được đẩy canvas ra khỏi tầm mắt.
+- **Thực tế**: Chỉ một số ít font hoạt động, các font nghệ thuật/fancy không hiển thị đúng.
+- **Mong đợi**: Toàn bộ 10 font trong danh sách phải hiển thị đúng kiểu dáng khi chọn.
 
 ---
 
 ## Phân tích Nguyên nhân Gốc rễ (Root Cause Analysis)
-1. **Lỗi Dịch chuyển (Page Shift)**: Mặc dù đã chặn được Zoom bằng font-size 16px, nhưng trình duyệt vẫn cố gắng thực hiện hành vi "Scroll into view" để đảm bảo ô nhập liệu (textarea ẩn của Fabric) nằm trên bàn phím. Do vị trí textarea ẩn này có thể đang bám theo vị trí chữ trên canvas (vốn có kích thước lớn 1772x1535), trình duyệt cuộn trang lên để "đưa" cái textarea đó lên trên, dẫn đến việc canvas bị đẩy đi.
-2. **Lỗi 4 chấm tròn (Dots)**: 
-   - Có thể do Fabric v7 quản lý control thông qua các object riêng biệt (`fabric.Control`). Việc set prototype `cornerSize` không ép các control này tính toán lại kích thước nếu chúng đã được "cached".
-   - Cần can thiệp sâu hơn vào thuộc tính `controls` của từng object.
+1. **Lỗi Font chữ**: Các font như `Pacifico`, `Montserrat`, `Lobster`... chưa được import vào dự án. Trong Next.js, cần khai báo các font này trong `layout.tsx` sử dụng `next/font/google` để trình duyệt tải về. Hiện tại chỉ có `Be Vietnam Pro` và `Playfair Display` được load chính thức.
+2. **Lỗi Dịch chuyển (Page Shift)**: Trình duyệt cố gắng cuộn trang để đưa textarea ẩn của Fabric vào vùng nhìn thấy được trên bàn phím.
+3. **Lỗi 4 chấm tròn (Dots)**: Cấu hình Prototype không đủ để ghi đè các control đã được cache của Fabric v7.
 
-**Sơ đồ luồng dịch chuyển:**
+**Sơ đồ luồng lỗi Font:**
 ```ascii
-[Focus Text] -> [Hidden Textarea positioned at Canvas X,Y] 
+[Select Font: Pacifico] -> [Fabric sets fontFamily: 'Pacifico']
        |                                |
-       |                  [Keyboard Pops Up]
+       |                  [Browser checks local/loaded fonts]
        |                                |
-       |           [Browser detects Textarea is "under" Keyboard]
-       |                                |
-       |               [Browser Scrolls Page UP to compensate]
-       |                                |
-       \----------------------> [CANVAS OFF-SCREEN]
+       |                 /----------+----------\
+       |            [Not Found]              [Found]
+       |                |                      |
+       |        [Fallback to Serif]       [Render Pacifico]
+       |                |                      |
+       \--------> [RESULT: NO CHANGE]      [SUCCESS]
 ```
 
 ## Đề xuất Sửa lỗi (Proposed Fixes — refined)
-1. **Xử lý Dịch chuyển (Shifting)**:
-   - **Selector phải là `textarea[data-fabric="textarea"]`** (textarea ẩn nằm ở `document.body`, không trong `.canvas-container`).
-   - Verify trong source `node_modules/fabric/dist/index.js:16993-16998`: Fabric gọi `updateTextareaPosition()` mỗi khi gõ phím — set `hiddenTextarea.style.left = ...` / `.top = ...` (không kèm `!important`), nên CSS `!important` sẽ thắng.
-   - **Fix**: Thêm vào `app/globals.css`:
-     ```css
-     textarea[data-fabric="textarea"] {
-       font-size: 16px !important;
-       position: fixed !important;
-       top: 0 !important;
-       left: 0 !important;
-     }
-     ```
-   - Cố định ở `top:0` (luôn trên keyboard) → Safari thấy textarea đã visible → không cần scroll → canvas không bị đẩy ra khỏi tầm mắt.
-   - Textarea vẫn `opacity: 0; width:1px; height:1px` (giữ inline) → vô hình; cursor và text vẽ trực tiếp trên canvas bởi Fabric, không phụ thuộc vị trí textarea.
+1. **Tải đầy đủ Font chữ (Khuyến nghị)**:
+   - Verify trong `components/DesignTool/TextPropsPanel.tsx:8-19`: dropdown liệt kê 10 font; chỉ `Be Vietnam Pro` + `Playfair Display` được load qua `next/font/google` ở `app/layout.tsx:6-18`. 8 font khác KHÔNG được load → browser fallback → không thay đổi được kiểu chữ.
+   - **Fix**: Dùng Google Fonts CDN qua `<link>` trong `app/layout.tsx` (đơn giản hơn 8 next/font imports cho design-tool fonts; preconnect để giảm latency).
+   - **Đồng thời**: trong `TextPropsPanel.tsx`, `await document.fonts.load("16px <fontFamily>")` trước khi `applyProp` — tránh canvas vẽ bằng fallback trong khi font đang download (Fabric đo dimensions tại thời điểm `renderAll`).
 
-2. **Sửa triệt để 4 chấm tròn**:
-   - Verify trong source `node_modules/fabric/dist/src/controls/Control.d.ts:73-85`: `Control.sizeX/sizeY` default `null` → fallback về `object.cornerSize`. Nên prototype + `obj.set({cornerSize})` đáng lẽ đủ. Nhưng để chắc chắn (chống cache hoặc edge case), bổ sung:
-     - Lặp `Object.values(obj.controls)` set `sizeX = sizeY = cornerSize` trực tiếp.
-     - Cập nhật cả `touchCornerSize` (touch hit area, mặc định 24).
-     - Thêm event `canvas.on("object:added", …)` áp size cho object mới (defensive — đảm bảo size luôn đúng dù prototype có race condition).
+2. **Page Shift & Dots**: Đã fix ở Hotfix #3 (commit 57552b8). Nếu vẫn còn:
+   - Có thể Vercel chưa deploy xong / browser cache → cần hard-refresh hoặc đợi vài phút.
+   - **Defensive bổ sung**: thêm listener `canvas.on("selection:created", …)` re-apply scale-compensated `cornerSize/sizeX/sizeY` ngay khi user click chọn object — bảo vệ khỏi race condition khi object được add trước khi ResizeObserver fire (lúc đó `scaleRef.current` còn là 1).
 
 ## Kế hoạch Xác minh
-1. **Test Shifting**: Đảm bảo khi gõ chữ, canvas vẫn nằm trong tầm mắt.
-2. **Test Dots**: 4 chấm tròn phải to, rõ, màu burgundy trên mọi thiết bị.
+1. **Test Font**: Chọn lần lượt 10 font, đảm bảo mỗi font đều hiển thị kiểu dáng riêng biệt.
+2. **Test Shifting**: Sửa chữ mà không bị cuộn trang.
+3. **Test Dots**: Hiện đầy đủ 4 chấm tròn ở góc.
 
-## Hotfix #3 — Page shifting + dots robust (2026-05-08)
+## Hotfix #4 — Fonts + defensive dots (2026-05-08)
 - **Files Changed**:
-    - `app/globals.css`: bổ sung `position: fixed; top:0; left:0` cho `textarea[data-fabric="textarea"]`. Pin textarea ẩn về góc trái-trên viewport → Safari thấy textarea đã visible khi focus → không cần scroll page → canvas không bị đẩy đi.
-    - `components/DesignTool/DesignToolCanvas.tsx`:
-        - Thêm `scaleRef` đồng bộ với state `scale` (tránh stale closure).
-        - Trong `useEffect([scale])`: thêm `touchCornerSize`, lặp `obj.controls` set trực tiếp `sizeX/sizeY = cornerSize` cho mỗi control (defensive — chống cache/edge case của Fabric Control).
-        - Thêm event listener `canvas.on("object:added", …)` áp size scale-compensated cho object mới ngay khi được thêm vào canvas (đảm bảo size đúng dù prototype có chậm cập nhật).
+    - `app/layout.tsx`: Thêm `<link>` Google Fonts (preconnect + stylesheet) load 8 font còn thiếu: Dancing Script, Great Vibes, Lobster, Montserrat, Nunito, Oswald, Pacifico, Raleway. (Be Vietnam Pro + Playfair Display vẫn qua `next/font` như cũ.)
+    - `components/DesignTool/TextPropsPanel.tsx`: `await document.fonts.load("16px <font>")` trước khi `applyProp({ fontFamily })` — đảm bảo font đã download xong trước khi Fabric đo dimensions và `renderAll`.
+    - `components/DesignTool/DesignToolCanvas.tsx`: Thêm defensive re-apply `cornerSize/touchCornerSize/borderScaleFactor` + per-control `sizeX/sizeY` trong handler `selection:created` (chống race condition khi object được add trước ResizeObserver).
 - **Test Results**:
-    - `npm run build` → ✓ Compiled successfully + 27/27 static pages OK.
+    - `npm run build` → ✓ Compiled successfully + 27/27 static pages OK, không warning.
     - Static verification 12/12 pass:
       ```
-      PASS  CSS: position fixed on Fabric textarea
-      PASS  CSS: top:0 !important on Fabric textarea
-      PASS  CSS: left:0 !important on Fabric textarea
-      PASS  CSS: font-size 16px (zoom prevention)
-      PASS  TSX: scaleRef declared
-      PASS  TSX: scaleRef synced in scale effect
-      PASS  TSX: object:added listener for sizes
-      PASS  TSX: per-control sizeX assignment
-      PASS  TSX: per-control sizeY assignment
-      PASS  TSX: touchCornerSize set
-      PASS  Fabric: still appends to body, data-fabric textarea
-      PASS  Fabric: updateTextareaPosition mutates style.left/top
+      PASS  Layout: preconnect Google Fonts
+      PASS  Layout: preconnect gstatic
+      PASS  TextPropsPanel: awaits document.fonts.load
+      PASS  Canvas: selection:created applies cornerSize
+      PASS  Layout loads font: Dancing+Script
+      PASS  Layout loads font: Pacifico
+      PASS  Layout loads font: Montserrat
+      PASS  Layout loads font: Nunito
+      PASS  Layout loads font: Lobster
+      PASS  Layout loads font: Oswald
+      PASS  Layout loads font: Raleway
+      PASS  Layout loads font: Great+Vibes
       ```
-- **Verification**: Cần test trên iPhone thực sau khi Vercel deploy: (a) tap vào chữ — viewport đứng yên; (b) upload ảnh và chọn — 4 chấm burgundy hiện rõ ở 4 góc.
+- **Verification cần làm**:
+    - Sau khi Vercel deploy, vào `/san-pham/[slug]` trên iPhone:
+        - Thêm chữ → dropdown Font, chọn từng font (Pacifico, Montserrat, …) → text trên canvas đổi kiểu rõ ràng.
+        - Tap vào chữ để sửa → canvas vẫn ở vị trí cũ, không bị đẩy lên.
+        - Upload ảnh → click chọn → 4 chấm tròn burgundy rõ ở 4 góc.
+- **Lưu ý**: Page-shift + dots size đã fix ở Hotfix #2/#3 (commit `ca56972`/`57552b8`). Nếu user vẫn thấy lỗi, hãy hard-refresh (Cmd+Shift+R / clear Safari cache) hoặc đợi Vercel deploy xong (~1-2 phút).
