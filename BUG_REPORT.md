@@ -1,68 +1,110 @@
 # Báo cáo Lỗi
-
 ## Trạng thái
-ĐÃ SỬA XONG
+THÀNH CÔNG
 
 ## Tiêu đề Lỗi
-Các liên kết chính sách ở Footer không hoạt động và chưa có trang nội dung tương ứng.
+Cải thiện bố cục Mobile và bổ sung tính năng hỗ trợ căn chỉnh trong Công cụ thiết kế.
 
 ## Mô tả Lỗi
-Hiện tại, ở phần footer của trang chủ, các mục "Chính sách bảo mật", "Điều khoản sử dụng", và "Đổi trả" chỉ là các thẻ `<span>` với hiệu ứng con trỏ chuột, nhưng không có logic chuyển trang và cũng chưa có các trang nội dung này trong hệ thống. Người dùng cũng chưa thể chỉnh sửa nội dung này từ trang quản trị.
+1. **Bố cục Mobile**: Thứ tự các thành phần trong công cụ thiết kế trên mobile chưa tối ưu (Nút Upload/Thêm chữ đang ở trên cùng, che khuất khu vực thiết kế quan trọng).
+2. **Trải nghiệm thiết kế**: Các đối tượng (ảnh, chữ) khi được chọn thiếu các điểm neo (dots) rõ ràng để điều chỉnh và thiếu các đường gióng (guidelines) để căn giữa, gây khó khăn cho người dùng khi muốn tạo thiết kế cân đối.
 
 ## Các bước tái hiện
-1. Cuộn xuống phần Footer ở trang chủ.
-2. Bấm vào "Chính sách bảo mật", "Điều khoản sử dụng" hoặc "Đổi trả".
-3. Kết quả: Không có gì xảy ra, trang không chuyển.
+1. Truy cập Trang sản phẩm trên thiết bị di động (hoặc chế độ giả lập mobile).
+2. Quan sát thứ tự: Upload/Thêm chữ -> Chọn khung -> Canvas.
+3. Thêm một ảnh hoặc chữ vào Canvas.
+4. Chọn đối tượng và di chuyển: Không có điểm chấm 4 góc màu burgundy và không có đường kẻ căn giữa xuất hiện.
 
 ## Kết quả Thực tế vs Kết quả Mong đợi
-- **Kết quả thực tế**: Các link không phản hồi khi click. Không có trang nội dung tương ứng.
-- **Kết quả mong đợi**: Khi click sẽ chuyển sang trang nội dung tương ứng (VD: `/chinh-sach-bao-mat`). Nội dung trang này có thể chỉnh sửa được từ `/admin/noi-dung`.
+- **Thực tế**:
+    - Mobile: Upload/Thêm chữ nằm trên Chọn khung và Canvas.
+    - Đối tượng chọn: Dùng mặc định của Fabric.js (thường là các ô vuông xanh/trắng).
+    - Di chuyển: Không có đường gióng hỗ trợ.
+- **Mong đợi**:
+    - Mobile: 1. Chọn Khung -> 2. Canvas -> 3. Upload/Thêm chữ.
+    - Đối tượng chọn: 4 điểm chấm tròn ở góc, màu Burgundy (#800020).
+    - Di chuyển/Thay đổi kích thước: Hiện đường kẻ đứt (hoặc liền) căn giữa dọc/ngang khi đối tượng ở vị trí trung tâm.
 
 ## Ngữ cảnh & Môi trường
-- File liên quan: `components/layout/Footer.tsx`, `app/admin/noi-dung/page.tsx`.
-- Cơ sở dữ liệu: Bảng `site_content`.
+- Hệ điều hành: Windows/iOS/Android.
+- Trình duyệt: Chrome/Safari/Edge.
+- Thư viện sử dụng: Next.js, Fabric.js v7.3.1, Tailwind CSS v4.
 
 ---
 
 ## Phân tích Nguyên nhân Gốc rễ (Root Cause Analysis)
-1. **UI Layout**: Trong `Footer.tsx`, các liên kết đang được để trong thẻ `<span>` thay vì `Link` hoặc `<a>`.
-2. **Routing**: Hệ thống chưa định nghĩa các route cho các trang chính sách này.
-3. **Data Model**: Bảng `site_content` chưa có các bản ghi (keys) để lưu trữ nội dung cho các trang này.
-4. **Admin UI**: Trang quản lý nội dung chưa hiển thị các trường để biên tập nội dung chính sách.
+1. **Về Layout**: Trong file `DesignToolCanvas.tsx`, JSX đang render Toolbar trước container chứa Frame và Canvas. Hiện tại chưa có class `order` để đảo thứ tự này trên mobile.
+2. **Về Control Dots**: Fabric.js mặc định sử dụng `cornerStyle: 'rect'`. Cần cấu hình lại `Object.prototype` hoặc từng đối tượng để có style `circle` và màu `cornerColor` tương ứng với brand.
+3. **Về Guidelines**: Logic căn gióng chưa được cài đặt. Cần bắt sự kiện `object:moving` và `object:scaling`, tính toán tọa độ đối tượng so với tâm Canvas (1772x1535) và vẽ các đường Line tạm thời.
 
+**Sơ đồ luồng xử lý Guidelines:**
 ```ascii
-[Footer.tsx] --(span)--> [No Link]
-      |
-      X (Missing Route)
-      |
-[App Directory] --(Missing)--> [policy pages]
-      |
-[site_content] --(Missing Keys)--> [policy_privacy, policy_terms, ...]
+[Object Moving] -> [Get Object Center] -> [Compare with Canvas Center (W/2, H/2)]
+       |                    |                            |
+       |                    |                  [Within Threshold (e.g. 5px)?]
+       |                    |                            |
+       |                    |                 /----------+----------\
+       |                    |               [YES]                  [NO]
+       |                    |                |                      |
+       |                    |       [Snap to Center &        [Remove Lines &
+       |                    |        Draw Red Line]           Render All]
+       \--------------------/
 ```
 
 ## Đề xuất Sửa lỗi (Proposed Fixes)
-1. **Cơ sở dữ liệu**: Thêm 3 bản ghi mới vào bảng `site_content` với các key: `policy_privacy`, `policy_terms`, `policy_shipping`. Thiết lập `type = 'richtext'`.
-2. **Routing & Pages**: 
-   - Tạo route động `app/(site)/chinh-sach/[slug]/page.tsx` hoặc các trang tĩnh riêng biệt để hiển thị nội dung từ `site_content`.
-   - Sử dụng một component để render HTML an toàn (dangerouslySetInnerHTML) từ trường `value` trong DB.
-3. **Footer**: Cập nhật `components/layout/Footer.tsx`, thay thế các thẻ `<span>` bằng `Link` trỏ đến các route mới tạo.
-4. **Admin Panel**: 
-   - Cập nhật `app/admin/noi-dung/page.tsx`, thêm section "Chính sách & Điều khoản" vào `SECTION_LABELS`.
-   - Đảm bảo các key mới xuất hiện trong giao diện chỉnh sửa.
+1. **Bố cục Mobile (Khuyến nghị)**:
+    - Đổi parent wrapper từ `space-y-4` → `flex flex-col gap-4` (gap-4 hoạt động đúng với flex `order`; `space-y-*` chỉ áp theo DOM order, sẽ sai khi đảo bằng `order`).
+    - Thêm `order-first lg:order-none` cho Main Content (Frame + Canvas).
+    - Toolbar, TextPropsPanel, Proceed Button giữ nguyên DOM order (mặc định `order: 0`) → trên mobile chúng nằm sau Main Content; trên desktop quay về thứ tự DOM ban đầu.
+    - Kết quả mobile: `Frames+Canvas → Toolbar → (TextPropsPanel) → Proceed`. Desktop: `Toolbar → Frames+Canvas → (TextPropsPanel) → Proceed` (không đổi).
 
-**Phương án khuyến nghị**: Sử dụng route động `/chinh-sach/[slug]` để tối ưu code và dễ dàng mở rộng thêm các trang nội dung tĩnh khác sau này.
+2. **Cải thiện điểm neo (Dots)**:
+    - Sau khi `import("fabric")`, cấu hình `FabricObject.prototype` 1 lần để áp dụng global cho mọi object mới (text, image, …):
+        - `cornerStyle: 'circle'`
+        - `cornerColor: '#800020'`
+        - `cornerStrokeColor: '#ffffff'`
+        - `transparentCorners: false`
+        - `cornerSize: 12`
+        - `borderColor: '#800020'`
+        - `padding: 2`
 
-## Kết quả Xác minh
-1. **Kiểm tra UI**: 
-   - [x] Click "Chính sách bảo mật" -> chuyển hướng thành công tới `/chinh-sach/chinh-sach-bao-mat`.
-   - [x] Click "Điều khoản sử dụng" -> chuyển hướng thành công tới `/chinh-sach/dieu-khoan-su-dung`.
-   - [x] Click "Đổi trả" -> chuyển hướng thành công tới `/chinh-sach/doi-tra`.
-2. **Kiểm tra Nội dung**: 
-   - [x] Nội dung hiển thị đúng tiêu đề và nội dung mặc định từ database.
-   - [x] Sử dụng `dangerouslySetInnerHTML` để render định dạng Rich Text.
-3. **Kiểm tra Admin**:
-   - [x] Mục "Chính sách & Điều khoản" đã xuất hiện trong `/admin/noi-dung`.
-   - [x] Có thể chỉnh sửa nội dung qua giao diện quản trị.
+3. **Thêm đường kẻ căn giữa + snap nhẹ**:
+    - Tạo 2 `Line` object (`vGuide`, `hGuide`) với `excludeFromExport: true` (không vào `toJSON()`/`toDataURL()`) + `selectable: false, evented: false`.
+    - Bind `canvas.on('object:moving', …)`: tính `obj.getCenterPoint()`, nếu `|cx - canvas.width/2| < 8px` → set `obj.left` để snap + `vGuide.visible = true`. Tương tự cho trục Y.
+    - Bind `canvas.on('object:scaling', …)`: chỉ hiển thị guide (không snap để không phá thao tác kéo scale).
+    - Bind `canvas.on('mouse:up' | 'selection:cleared', …)`: ẩn guides.
+    - Khi `handleApplyFrame` gọi `canvas.clear()` → guides bị xoá; hàm `ensureGuides()` sẽ tự re-create lần move kế tiếp.
+    - Màu: `oklch(0.78 0.12 80)` (Gold) — tương phản với Burgundy của điểm neo. Stroke dashed `[10, 10]`, width 2.
 
-**Trạng thái cuối cùng**: Thành công.
-**Build Output**: `Compiled successfully`.
+## Kế hoạch Xác minh
+1. **Kiểm tra Layout**: Dùng DevTools giả lập iPhone/Pixel để xem thứ tự các panel.
+2. **Kiểm tra UI**: Thêm đối tượng, click chọn để xem 4 chấm tròn ở góc.
+3. **Kiểm tra Logic**: Di chuyển đối tượng từ từ vào giữa canvas, xác nhận đường kẻ xuất hiện và đối tượng có cảm giác "hít" (snap) nhẹ vào tâm.
+4. **Hồi quy**: Kiểm tra trên Desktop xem Toolbar có bị nhảy vị trí không (không được phép thay đổi).
+
+---
+
+## Fix Applied
+- **Files Changed**:
+    - `components/DesignTool/DesignToolCanvas.tsx`
+        - Layout: parent wrapper `space-y-4` → `flex flex-col gap-4`; Main Area thêm `order-first lg:order-none`.
+        - Selection controls: cấu hình `FabricObject.prototype` (circle dots, `#800020`, `cornerSize: 12`, white stroke, `padding: 2`).
+        - Guidelines: thêm 2 `Line` (vGuide/hGuide) màu gold `#D4AF37` dashed `[10,10]`, `excludeFromExport: true`. Bind `object:moving` (snap + show), `object:scaling` (chỉ show), `mouse:up`/`selection:cleared` (hide). `ensureGuides()` re-tạo nếu canvas bị clear (đổi frame).
+- **Test Results**:
+    - `npm run build` → ✓ Compiled successfully + Generating static pages 27/27 OK.
+    - Static verification script (12 checks) → 12 passed / 0 failed:
+      ```
+      PASS  Mobile layout: parent flex flex-col gap-4
+      PASS  Mobile layout: order-first lg:order-none on main area
+      PASS  Control dots: cornerStyle circle
+      PASS  Control dots: cornerColor burgundy
+      PASS  Control dots: transparentCorners false
+      PASS  Guides: vGuide Line creation
+      PASS  Guides: hGuide Line creation
+      PASS  Guides: object:moving listener
+      PASS  Guides: object:scaling listener
+      PASS  Guides: excludeFromExport
+      PASS  Guides: gold dashed stroke
+      PASS  Guides: hideGuides on mouse:up
+      ```
+- **Verification**: Code đã đúng vị trí, type-check sạch, build pass. Cần kiểm tra thị giác cuối cùng trên trình duyệt (mobile viewport + desktop) sau khi Vercel preview build xong.

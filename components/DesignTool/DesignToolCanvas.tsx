@@ -84,8 +84,18 @@ export default function DesignToolCanvas({
     if (!canvasRef.current) return;
 
     // Dynamic import to avoid SSR
-    import("fabric").then(({ Canvas }) => {
+    import("fabric").then(({ Canvas, FabricObject, Line }) => {
       if (!canvasRef.current) return;
+
+      // Brand-styled selection controls (circle dots, burgundy)
+      FabricObject.prototype.cornerStyle = "circle";
+      FabricObject.prototype.cornerColor = "#800020";
+      FabricObject.prototype.cornerStrokeColor = "#ffffff";
+      FabricObject.prototype.transparentCorners = false;
+      FabricObject.prototype.cornerSize = 12;
+      FabricObject.prototype.borderColor = "#800020";
+      FabricObject.prototype.padding = 2;
+
       const canvas = new Canvas(canvasRef.current, {
         width: DEFAULT_CANVAS_WIDTH,
         height: DEFAULT_CANVAS_HEIGHT,
@@ -102,6 +112,81 @@ export default function DesignToolCanvas({
       canvas.on("object:modified", saveSnapshot);
       canvas.on("object:added", saveSnapshot);
       canvas.on("object:removed", saveSnapshot);
+
+      // Center alignment guides (gold dashed lines + soft snap)
+      const SNAP_THRESHOLD = 8;
+      let vGuide: InstanceType<typeof Line> | null = null;
+      let hGuide: InstanceType<typeof Line> | null = null;
+      const ensureGuides = () => {
+        const w = canvas.getWidth();
+        const h = canvas.getHeight();
+        if (!vGuide || !canvas.getObjects().includes(vGuide)) {
+          vGuide = new Line([w / 2, 0, w / 2, h], {
+            stroke: "#D4AF37",
+            strokeDashArray: [10, 10],
+            strokeWidth: 2,
+            selectable: false,
+            evented: false,
+            visible: false,
+            excludeFromExport: true,
+            hoverCursor: "default",
+          });
+          canvas.add(vGuide);
+        }
+        if (!hGuide || !canvas.getObjects().includes(hGuide)) {
+          hGuide = new Line([0, h / 2, w, h / 2], {
+            stroke: "#D4AF37",
+            strokeDashArray: [10, 10],
+            strokeWidth: 2,
+            selectable: false,
+            evented: false,
+            visible: false,
+            excludeFromExport: true,
+            hoverCursor: "default",
+          });
+          canvas.add(hGuide);
+        }
+        canvas.bringObjectToFront(vGuide!);
+        canvas.bringObjectToFront(hGuide!);
+      };
+      const hideGuides = () => {
+        vGuide?.set({ visible: false });
+        hGuide?.set({ visible: false });
+        canvas.requestRenderAll();
+      };
+      canvas.on("object:moving", (e) => {
+        const obj = e.target;
+        if (!obj || obj === vGuide || obj === hGuide) return;
+        ensureGuides();
+        const cx = canvas.getWidth() / 2;
+        const cy = canvas.getHeight() / 2;
+        const center = obj.getCenterPoint();
+        if (Math.abs(center.x - cx) < SNAP_THRESHOLD) {
+          obj.left = (obj.left ?? 0) + (cx - center.x);
+          vGuide?.set({ visible: true });
+        } else {
+          vGuide?.set({ visible: false });
+        }
+        if (Math.abs(center.y - cy) < SNAP_THRESHOLD) {
+          obj.top = (obj.top ?? 0) + (cy - center.y);
+          hGuide?.set({ visible: true });
+        } else {
+          hGuide?.set({ visible: false });
+        }
+        obj.setCoords();
+      });
+      canvas.on("object:scaling", (e) => {
+        const obj = e.target;
+        if (!obj || obj === vGuide || obj === hGuide) return;
+        ensureGuides();
+        const cx = canvas.getWidth() / 2;
+        const cy = canvas.getHeight() / 2;
+        const center = obj.getCenterPoint();
+        vGuide?.set({ visible: Math.abs(center.x - cx) < SNAP_THRESHOLD });
+        hGuide?.set({ visible: Math.abs(center.y - cy) < SNAP_THRESHOLD });
+      });
+      canvas.on("mouse:up", hideGuides);
+      canvas.on("selection:cleared", hideGuides);
 
       // Track selection
       canvas.on("selection:created", (e) => {
@@ -411,7 +496,7 @@ export default function DesignToolCanvas({
   }, [productId, productName, productPrice, selectedFrame, selectedVariant, router]);
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       {/* Top toolbar */}
       <div className="flex flex-wrap items-center gap-2 p-3 bg-background border border-border rounded-xl">
         {/* Photo upload */}
@@ -511,7 +596,7 @@ export default function DesignToolCanvas({
       </div>
 
       {/* Main area: frame panel + canvas */}
-      <div className="flex flex-col lg:flex-row gap-4">
+      <div className="order-first lg:order-none flex flex-col lg:flex-row gap-4">
         {/* Left panel: frames */}
         {frames.length > 0 && (
           <div
