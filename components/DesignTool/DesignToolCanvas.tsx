@@ -85,7 +85,7 @@ export default function DesignToolCanvas({
     if (!canvasRef.current) return;
 
     // Dynamic import to avoid SSR
-    import("fabric").then(({ Canvas, FabricObject, Line }) => {
+    import("fabric").then(({ Canvas, FabricObject, Line, IText }) => {
       if (!canvasRef.current) return;
 
       // Brand-styled selection controls (circle dots, burgundy)
@@ -96,6 +96,14 @@ export default function DesignToolCanvas({
       FabricObject.prototype.cornerSize = 12;
       FabricObject.prototype.borderColor = "#800020";
       FabricObject.prototype.padding = 2;
+
+      // Mobile-friendly text editing: double-tap selects ALL text (not just word)
+      (IText.prototype as unknown as { doubleClickHandler: () => void }).doubleClickHandler =
+        function (this: InstanceType<typeof IText>) {
+          if (!this.isEditing) return;
+          this.selectAll();
+          this.renderCursorOrSelection();
+        };
 
       const canvas = new Canvas(canvasRef.current, {
         width: DEFAULT_CANVAS_WIDTH,
@@ -207,6 +215,70 @@ export default function DesignToolCanvas({
       });
       canvas.on("mouse:up", hideGuides);
       canvas.on("selection:cleared", hideGuides);
+
+      // Long-press on IText (in edit mode):
+      // - hold ~400ms with no significant movement → select 1 character at finger
+      // - hold + drag → cursor follows finger (single-position, no range)
+      // - move before timer fires → cancel, default Fabric drag-select behavior
+      type ITextLike = {
+        isEditing?: boolean;
+        type?: string;
+        text?: string;
+        selectionStart?: number;
+        selectionEnd?: number;
+        getSelectionStartFromPointer?: (e: MouseEvent | TouchEvent) => number;
+        renderCursorOrSelection?: () => void;
+      };
+      let pressTimer: ReturnType<typeof setTimeout> | null = null;
+      let longPressActive = false;
+      let pressStart: { x: number; y: number } | null = null;
+      const LONG_PRESS_MS = 400;
+      const MOVE_CANCEL_PX2 = 30 * 30; // ~30 scene-px before cancelling
+      const clearPressTimer = () => {
+        if (pressTimer) {
+          clearTimeout(pressTimer);
+          pressTimer = null;
+        }
+      };
+      canvas.on("mouse:down", (opt) => {
+        const t = opt.target as ITextLike | undefined;
+        if (!t || (t.type !== "i-text" && t.type !== "text") || !t.isEditing) return;
+        longPressActive = false;
+        pressStart = opt.scenePoint ? { x: opt.scenePoint.x, y: opt.scenePoint.y } : null;
+        clearPressTimer();
+        pressTimer = setTimeout(() => {
+          pressTimer = null;
+          longPressActive = true;
+          if (typeof t.getSelectionStartFromPointer !== "function") return;
+          const idx = t.getSelectionStartFromPointer(opt.e as MouseEvent);
+          const len = t.text?.length ?? 0;
+          t.selectionStart = idx;
+          t.selectionEnd = Math.min(idx + 1, len);
+          t.renderCursorOrSelection?.();
+          canvas.requestRenderAll();
+        }, LONG_PRESS_MS);
+      });
+      canvas.on("mouse:move", (opt) => {
+        const t = (opt.target ?? canvas.getActiveObject()) as ITextLike | undefined;
+        if (!t || (t.type !== "i-text" && t.type !== "text") || !t.isEditing) return;
+        if (longPressActive) {
+          if (typeof t.getSelectionStartFromPointer !== "function") return;
+          const idx = t.getSelectionStartFromPointer(opt.e as MouseEvent);
+          t.selectionStart = idx;
+          t.selectionEnd = idx;
+          t.renderCursorOrSelection?.();
+          canvas.requestRenderAll();
+        } else if (pressTimer && pressStart && opt.scenePoint) {
+          const dx = opt.scenePoint.x - pressStart.x;
+          const dy = opt.scenePoint.y - pressStart.y;
+          if (dx * dx + dy * dy > MOVE_CANCEL_PX2) clearPressTimer();
+        }
+      });
+      canvas.on("mouse:up", () => {
+        clearPressTimer();
+        longPressActive = false;
+        pressStart = null;
+      });
 
       // Track selection
       canvas.on("selection:created", (e) => {

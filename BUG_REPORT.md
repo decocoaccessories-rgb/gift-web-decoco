@@ -1,6 +1,48 @@
 # Báo cáo Lỗi
 ## Trạng thái
-THÀNH CÔNG (Bổ sung 8 font + defensive dots reapply)
+THÀNH CÔNG (Hotfix #5: mobile touch text-editing UX)
+
+## [Hotfix #5] Mobile touch interactions cho IText editing
+### Yêu cầu
+Trên mobile, trong Công cụ thiết kế:
+1. **Bấm 2 lần (double-tap)** vào text → bôi đen TOÀN BỘ chữ.
+2. **Giữ tay (long-press)** ở 1 chữ cái → bôi đen chữ cái đó.
+3. **Giữ tay + di chuyển (long-press + drag)** → con trỏ chạy theo ngón tay sang vị trí chữ cái mới.
+
+### Phân tích & Đề xuất Sửa lỗi
+- Verify Fabric source `node_modules/fabric/dist/index.js`:
+    - L17763 `doubleClickHandler`: mặc định gọi `selectWord` → cần override sang `selectAll`.
+    - L16736 `selectAll()` + L17838 `getSelectionStartFromPointer(e)` + `renderCursorOrSelection()` đều có sẵn.
+- **Fix**:
+    - Override `IText.prototype.doubleClickHandler` → `selectAll() + renderCursorOrSelection()`.
+    - Thêm canvas listener `mouse:down/move/up`:
+        - mousedown trên IText.isEditing → start timer 400ms.
+        - Trong khoảng đó, nếu di chuyển > ~30 scene-px (≈10 screen-px ở scale 0.34) → cancel timer (drag-select bình thường của Fabric).
+        - Timer bắn → `selectionStart = idx; selectionEnd = idx+1` (bôi 1 chữ).
+        - Sau khi long-press active, mỗi mousemove → `selectionStart = selectionEnd = idx` (cursor follows finger).
+        - mouseup → reset state.
+
+### Test Results
+- `npm run build` → ✓ Compiled successfully + 27/27 static pages OK.
+- Static verification 10/10 pass:
+  ```
+  PASS  IText imported in dynamic import
+  PASS  doubleClickHandler overridden to selectAll
+  PASS  LONG_PRESS_MS defined
+  PASS  mouse:down sets press timer
+  PASS  long-press selects single char
+  PASS  mouse:move updates cursor while longPressActive
+  PASS  movement cancels timer
+  PASS  mouse:up resets state
+  PASS  Fabric: doubleClickHandler exists
+  PASS  Fabric: selectAll exists
+  ```
+
+### Verification cần làm trên iPhone
+1. Thêm chữ → tap 1 lần để vào edit mode → tap 2 lần nhanh → bôi đen toàn bộ chữ.
+2. Ở trạng thái edit, giữ ngón tay yên trên 1 chữ ~0.5s → chữ đó được bôi đen.
+3. Trong khi đang giữ, kéo ngón tay sang chữ khác → cursor (vạch nháy) chạy theo ngón tay.
+4. Tap rồi kéo nhanh (không giữ) → vẫn drag-select range như mặc định Fabric (không bị phá).
 
 ## Tiêu đề Lỗi
 [TIẾP TỤC] 4 chấm tròn vẫn mất, màn hình dịch chuyển và lỗi không đổi Font chữ.
