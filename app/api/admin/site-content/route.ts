@@ -11,6 +11,13 @@ const patchSchema = z.object({
   ).min(1),
 });
 
+/* Metadata for known image keys so upsert always writes the correct section */
+const KNOWN_KEY_METADATA: Record<string, { section: string; type: string; label: string }> = {
+  hero_image:        { section: "hero",  type: "image", label: "Ảnh Hero (Desktop)" },
+  hero_image_mobile: { section: "hero",  type: "image", label: "Ảnh Hero (Mobile)" },
+  story_image:       { section: "story", type: "image", label: "Ảnh Story (Giới thiệu)" },
+};
+
 export async function GET() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -40,9 +47,18 @@ export async function PATCH(request: NextRequest) {
 
   const admin = createAdminClient();
   for (const { key, value } of parsed.data.updates) {
+    const meta = KNOWN_KEY_METADATA[key];
     await admin
       .from("site_content")
-      .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: "key" });
+      .upsert(
+        {
+          key,
+          value,
+          updated_at: new Date().toISOString(),
+          ...(meta && { section: meta.section, type: meta.type, label: meta.label }),
+        },
+        { onConflict: "key" }
+      );
   }
 
   return NextResponse.json({ success: true });
