@@ -108,3 +108,12 @@ Cải thiện bố cục Mobile và bổ sung tính năng hỗ trợ căn chỉn
       PASS  Guides: hideGuides on mouse:up
       ```
 - **Verification**: Code đã đúng vị trí, type-check sạch, build pass. Cần kiểm tra thị giác cuối cùng trên trình duyệt (mobile viewport + desktop) sau khi Vercel preview build xong.
+
+## Hotfix #1 — chấm tròn không hiện trên mobile (2026-05-08)
+- **Triệu chứng**: User báo trên iPhone (Safari, Vercel deploy), khi chọn ảnh, các chấm tròn burgundy không thấy.
+- **Nguyên nhân**: Canvas Fabric vẽ ở 1772×1535 rồi CSS-scale xuống bằng `transform: scale(${scale})`. Mobile width ~600px → `scale ≈ 0.34`. `cornerSize: 12` (px canvas) → trên màn hình chỉ ~4px → gần như vô hình.
+- **Sửa**: Thêm `useEffect` theo `scale` trong `DesignToolCanvas.tsx`:
+  - `cornerSize = round(16 / scale)` để chấm luôn hiện ~16px trên màn hình.
+  - `borderScaleFactor = max(2, round(2 / scale))` để viền chọn vẫn nhìn rõ.
+  - Cập nhật cả `FabricObject.prototype` (cho object mới) lẫn các object đang có (`canvas.getObjects().forEach`).
+- **Test**: `npm run build` ✓ pass.

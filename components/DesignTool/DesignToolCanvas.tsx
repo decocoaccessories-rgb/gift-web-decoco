@@ -258,6 +258,23 @@ export default function DesignToolCanvas({
     return () => observer.disconnect();
   }, [canvasDims.width]);
 
+  // Compensate for CSS scale so selection dots stay ~16px on screen at any viewport
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    const inv = 1 / Math.max(scale, 0.05);
+    const cornerSize = Math.round(16 * inv);
+    const borderScaleFactor = Math.max(2, Math.round(2 * inv));
+    import("fabric").then(({ FabricObject }) => {
+      FabricObject.prototype.cornerSize = cornerSize;
+      FabricObject.prototype.borderScaleFactor = borderScaleFactor;
+    });
+    canvas.getObjects().forEach((o) => {
+      o.set({ cornerSize, borderScaleFactor });
+    });
+    canvas.requestRenderAll();
+  }, [scale]);
+
   const handleUndo = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas || historyIndexRef.current <= 0) return;
