@@ -18,7 +18,8 @@ const SECTION_LABELS: Record<string, string> = {
 };
 
 const IMAGE_HINTS: Record<string, string> = {
-  hero_image: "Khuyến nghị: 1920×1080px (tỉ lệ 16:9, toàn màn hình)",
+  hero_image: "Khuyến nghị: 1920×1080px (tỉ lệ 16:9, desktop ngang)",
+  hero_image_mobile: "Khuyến nghị: 1080×1920px (tỉ lệ 9:16, mobile dọc)",
   story_image: "Khuyến nghị: 800×800px (tỉ lệ vuông 1:1)",
 };
 
@@ -243,9 +244,9 @@ export default function AdminNoiDungPage() {
           <h2 className="font-semibold text-sm">Quản lý ảnh</h2>
         </div>
         <div className="p-5 space-y-6">
-          {/* Hero image */}
+          {/* Hero image — desktop */}
           <div className="space-y-1.5">
-            <Label>Ảnh Hero (Banner chính)</Label>
+            <Label>Ảnh Hero (Desktop)</Label>
             <ImageUploadField
               value={drafts["hero_image"] ?? ""}
               onChange={(url) => setDrafts((d) => ({ ...d, hero_image: url }))}
@@ -260,6 +261,34 @@ export default function AdminNoiDungPage() {
                 className="gap-1.5"
               >
                 {saving["hero_image"] ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Lưu
+              </Button>
+            </div>
+          </div>
+
+          <div className="border-t border-border" />
+
+          {/* Hero image — mobile */}
+          <div className="space-y-1.5">
+            <Label>Ảnh Hero (Mobile)</Label>
+            <ImageUploadField
+              value={drafts["hero_image_mobile"] ?? ""}
+              onChange={(url) => setDrafts((d) => ({ ...d, hero_image_mobile: url }))}
+              hint={IMAGE_HINTS["hero_image_mobile"]}
+            />
+            <div className="flex justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => saveContentKey("hero_image_mobile")}
+                disabled={saving["hero_image_mobile"]}
+                className="gap-1.5"
+              >
+                {saving["hero_image_mobile"] ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Save className="h-3.5 w-3.5" />

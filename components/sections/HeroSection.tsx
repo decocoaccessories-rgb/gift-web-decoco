@@ -16,7 +16,11 @@ export default function HeroSection({ content }: HeroSectionProps) {
   const headline = content.hero_headline ?? DEFAULT_HEADLINE;
   const subtext = content.hero_subtext ?? DEFAULT_SUBTEXT;
   const heroImage = content.hero_image ?? "";
-  const hasImage = !!heroImage;
+  const heroImageMobile = content.hero_image_mobile ?? "";
+  // Mobile: prefer mobile image, fall back to desktop. Desktop: prefer desktop, fall back to mobile.
+  const mobileSrc = heroImageMobile || heroImage;
+  const desktopSrc = heroImage || heroImageMobile;
+  const hasImage = !!(mobileSrc || desktopSrc);
 
   const [before, after] = headline.includes("—")
     ? headline.split("—").map((s) => s.trim())
@@ -30,14 +34,26 @@ export default function HeroSection({ content }: HeroSectionProps) {
       {hasImage ? (
         <>
           <div className="absolute inset-0 -z-10">
-            <Image
-              src={heroImage}
-              alt="DECOCO Hero"
-              fill
-              priority
-              sizes="100vw"
-              className="object-cover"
-            />
+            {mobileSrc && (
+              <Image
+                src={mobileSrc}
+                alt="DECOCO Hero"
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover md:hidden"
+              />
+            )}
+            {desktopSrc && (
+              <Image
+                src={desktopSrc}
+                alt="DECOCO Hero"
+                fill
+                priority
+                sizes="100vw"
+                className="object-cover hidden md:block"
+              />
+            )}
           </div>
           <div className="absolute inset-0 -z-10 bg-black/50" />
         </>

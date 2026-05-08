@@ -1,137 +1,64 @@
 # Bug Report
 
 ## Status
-THÀNH CÔNG (Hotfix #C2: continuous alternating loop while in viewport)
+THÀNH CÔNG — Hero responsive: 2 ảnh background riêng biệt cho desktop/mobile.
 
-## [Hotfix #C2] User feedback
-- **User report**: "ảnh 2 chỉ hiện 1 lúc rồi quay lại ảnh 1 và dừng. Muốn lặp lại liên tục: ảnh 1 → ảnh 2 → ảnh 1 → ảnh 2 …"
-- **Phân tích**: Code C1 dùng 2 `setTimeout` one-shot rồi `observer.disconnect()` → chỉ chạy 1 vòng.
-- **Fix**: thay 2 setTimeout bằng `setInterval` toggle `showSecond` mỗi ~1800ms. Giữ observer luôn observe (không disconnect) để pause cycle khi card rời viewport (tiết kiệm pin), resume khi vào lại. Cleanup interval + observer khi unmount.
+## Yêu cầu
+Hero Section trên Trang chủ hiện chỉ có 1 ảnh background (`hero_image`). Trên mobile portrait viewport (~390×844), ảnh landscape 16:9 bị crop nặng. Cần:
+1. Cho admin upload riêng 2 ảnh: 1 cho desktop, 1 cho mobile.
+2. Frontend tự chọn ảnh phù hợp theo viewport.
+3. Hint kích thước mobile hiển thị trong admin.
 
-### Test Results (C2)
-- `npm run build` → ✓ Compiled successfully + 27/27 pages OK.
-- Static verification 10/10 pass:
-  ```
-  PASS  Uses setInterval for continuous loop
-  PASS  No more one-shot setTimeout(setShowSecond(true))
-  PASS  Toggles showSecond via prev callback
-  PASS  SWAP_MS = 1800
-  PASS  startCycle defined
-  PASS  stopCycle defined
-  PASS  Observer pauses on leave viewport (else stopCycle)
-  PASS  Cleanup disconnects observer + stops cycle
-  PASS  Skips when only one image
-  PASS  No more disconnect inside intersection callback
-  ```
+## Đề xuất kích thước
+| Bản | Kích thước khuyến nghị | Tỉ lệ | Lý do |
+|---|---|---|---|
+| Desktop | 1920×1080px | 16:9 (landscape) | Đã có sẵn, fit `min-h-screen` trên viewport ngang |
+| **Mobile** | **1080×1920px** | **9:16 (portrait)** | iPhone/Android portrait ~390×844; ảnh dọc fit object-cover không bị crop chủ thể |
 
-### Verification trên iPhone (sau Vercel deploy)
-- Cuộn xuống "Sản phẩm nổi bật" → mỗi card hiện ảnh 1 (1.8s) → fade ảnh 2 (1.8s) → fade ảnh 1 (1.8s) → ... lặp vô tận khi card còn trong viewport.
-- Cuộn card ra khỏi viewport → cycle dừng (tiết kiệm pin). Cuộn lại → cycle tiếp tục (giữ trạng thái cuối cùng).
-- Desktop hover → CSS hover vẫn override interval state.
+## Phân tích & Đề xuất Sửa lỗi
+- `components/sections/HeroSection.tsx:18,32-41`: chỉ dùng 1 `heroImage` cho mọi viewport.
+- `supabase/migrations/002_seed_data.sql:13`: chỉ có row `hero_image`.
+- `app/admin/noi-dung/page.tsx:20-23,247-270`: chỉ có 1 ImageUploadField cho `hero_image`. `IMAGE_HINTS` không có entry mobile.
 
-## Bug Title
-Trên mobile, ảnh thứ 2 của sản phẩm không hiện khi chạm vào card ở Section "Sản phẩm nổi bật".
-
-## Bug Description
-Trên Trang chủ → Section "Sản phẩm nổi bật", mỗi card sản phẩm có 2 ảnh: ảnh chính + ảnh thứ 2 (hover preview). Trên Desktop, di chuột vào ảnh → ảnh thứ 2 fade-in. Trên Mobile, không có cách nào thấy được ảnh thứ 2 — tap chỉ navigate sang trang chi tiết sản phẩm.
-
-## Steps to Reproduce
-1. Mở Trang chủ trên iPhone (gift-web-decoco.vercel.app).
-2. Cuộn xuống Section "Sản phẩm nổi bật".
-3. Chạm vào ảnh sản phẩm.
-4. **Kết quả**: Trang nhảy sang `/san-pham/[slug]`, không kịp thấy ảnh thứ 2.
-
-## Actual vs Expected
-- **Thực tế**: Mobile chỉ thấy ảnh chính. Ảnh 2 không hiện ra dù cố gắng tap/hold.
-- **Mong đợi**: Có cách nào đó (tap, long-press, hoặc auto) cho mobile xem được ảnh 2 trước khi quyết định vào trang chi tiết.
-
-## Context
-- File: `components/ui/ProductCard.tsx`
-- Browser: Mobile Safari (iOS) / Chrome Android.
-
----
-
-## Root Cause Analysis
-
-`components/ui/ProductCard.tsx:31-40` dùng **pure CSS `group-hover`** để fade hoán đổi 2 ảnh:
-
-```
-<Image className="... group-hover:opacity-0" />        {/* ảnh 1 */}
-<Image className="... opacity-0 group-hover:opacity-100" />  {/* ảnh 2 */}
-```
-
-```ascii
-Desktop:  mouse enter  → :hover on .group → opacity transition → user thấy ảnh 2
-Mobile:   tap (touchstart) → click ngay lập tức → navigate → :hover không kịp render
-          (iOS có "first tap = hover, second tap = click" nhưng chỉ cho 1 số dạng hover style;
-           fade opacity thường không trigger behavior này → tap là click luôn)
-```
-
-→ Mobile không có sự kiện hover bền vững → ảnh 2 không bao giờ visible.
-
-## Proposed Fixes
-
-### Option A — CSS-only, minimal (Recommended cho minimal change)
-Thêm `group-active:opacity-*` song song với `group-hover:opacity-*`. Trên mobile, press-and-hold ảnh → ảnh 2 hiện trong lúc giữ; thả tay → vừa quay lại ảnh 1 vừa navigate.
-
-```diff
-- group-hover:opacity-0
-+ group-hover:opacity-0 group-active:opacity-0
-- group-hover:opacity-100
-+ group-hover:opacity-100 group-active:opacity-100
-```
-
-- **Pros**: 0 JS, 0 state, không refactor; desktop hover giữ nguyên.
-- **Cons**: User phải biết "press and hold" để xem ảnh 2 (không trực quan); thả tay là navigate luôn.
-
-### Option B — Tap-to-preview (UX tốt hơn, cần client component)
-Convert ProductCard sang Client Component. Tap đầu tiên trên ảnh = show ảnh 2 (preventDefault navigate). Tap thứ 2 trong 2s = navigate. Phần info bên dưới (tên + giá) luôn navigate ngay khi tap.
-
-```ascii
-Mobile:
-  tap 1 trên ảnh    → showSecond=true, preventDefault → user thấy ảnh 2
-  tap 2 trên ảnh    → navigate
-  tap trên info     → navigate ngay (không cần preview)
-  no interaction 2s → showSecond=false (revert)
-Desktop:
-  hover            → CSS group-hover (giữ nguyên, không bị ảnh hưởng)
-```
-
-- **Pros**: UX tự nhiên, giống pattern Shopee mobile preview; 2 ảnh đều khám phá được.
-- **Cons**: ProductCard thành "use client" (mất 1 chút SSR benefit cho card này); thêm state + touch handler; nhỉnh hơn về complexity.
-
-### Option C — Auto-cycle khi vào viewport (Không cần tương tác)
-Dùng `IntersectionObserver`: khi card scroll vào viewport lần đầu, fade ảnh 1 → ảnh 2 → ảnh 1 (loop 1 lần).
-
-- **Pros**: User không cần làm gì; ảnh 2 hiển thị tự nhiên.
-- **Cons**: Cần Client Component + observer; có thể annoying nếu user scroll nhanh; nhiều card cùng cycle gây "đập mắt".
+**Fix**:
+1. **Migration mới** `supabase/migrations/003_hero_image_mobile.sql`: INSERT row `hero_image_mobile` với metadata phù hợp. ON CONFLICT DO NOTHING (idempotent).
+2. **HeroSection.tsx**: render 2 `<Image>` — mobile (`md:hidden`) + desktop (`hidden md:block`). Nếu chỉ có desktop image → desktop image hiện trên cả 2 viewport (graceful fallback). Nếu chỉ có mobile → ngược lại.
+3. **Admin noi-dung/page.tsx**:
+    - Thêm `hero_image_mobile` vào `IMAGE_HINTS` + `IMAGE_KEYS`.
+    - Thêm field hardcoded cho mobile bên cạnh field hero (cùng pattern).
+    - Hint: "Khuyến nghị: 1080×1920px (tỉ lệ 9:16, dọc - mobile portrait)".
 
 ## Verification Plan
-1. Mở `/` trên iPhone Safari, cuộn đến "Sản phẩm nổi bật".
-2. Khi mỗi card lần đầu vào viewport (≥50%) → sau 400ms fade sang ảnh 2, hiển thị ~1.4s, fade về ảnh 1.
-3. Cuộn lại lên rồi xuống → KHÔNG cycle lại (observer đã disconnect sau lần đầu — tránh annoying).
-4. Hồi quy desktop: hover vẫn fade-swap như cũ; click vẫn navigate.
+1. Mở admin `/admin/noi-dung` → Quản lý ảnh → thấy 2 field: "Ảnh Hero (Desktop)" + "Ảnh Hero (Mobile)" với hint kích thước riêng.
+2. Upload 2 ảnh khác nhau, save.
+3. Mở Trang chủ trên desktop → thấy ảnh desktop. Mở trên mobile (DevTools iPhone preset) → thấy ảnh mobile.
+4. Hồi quy: nếu chỉ upload 1 ảnh (desktop) → hiển thị trên cả 2 viewport như cũ.
 
 ## Fix Applied
 - **Files Changed**:
-    - `components/ui/ProductCard.tsx`: convert sang `"use client"`. Thêm `useRef<HTMLAnchorElement>` + `useState(showSecond)` + `useEffect` mount IntersectionObserver (threshold 0.5). Lần đầu card vào viewport → setTimeout 400ms set `showSecond=true`, 1800ms set `showSecond=false`, sau đó disconnect observer (chỉ chạy 1 lần).
-    - Class ảnh thêm conditional: image 1 nhận `opacity-0` khi `showSecond`, image 2 nhận `opacity-100`. CSS `group-hover:opacity-*` của desktop giữ nguyên (specificity của pseudo > class nên hover vẫn override).
-    - Cleanup useEffect: disconnect observer + clear timers (tránh memory leak khi unmount giữa chừng).
-    - Skip khi chỉ có 1 ảnh (`hoverImage === primaryImage`) → không tạo observer.
+    - `supabase/migrations/003_hero_image_mobile.sql` (new): INSERT row `hero_image_mobile` với type=image, section=hero, label đầy đủ. Idempotent (ON CONFLICT DO NOTHING). **LƯU Ý**: chạy file này ở Supabase Dashboard SQL Editor để row có metadata sạch — không bắt buộc vì API `upsert` by key sẽ tự tạo row khi save lần đầu.
+    - `components/sections/HeroSection.tsx`: thêm read `content.hero_image_mobile`. Render 2 `<Image>`: mobile (`md:hidden`) + desktop (`hidden md:block`). Mỗi ảnh fall back sang ảnh còn lại nếu thiếu (graceful degradation).
+    - `app/admin/noi-dung/page.tsx`:
+        - `IMAGE_HINTS`: thêm `hero_image_mobile` với hint "Khuyến nghị: 1080×1920px (tỉ lệ 9:16, mobile dọc)".
+        - Đổi label "Ảnh Hero (Banner chính)" → "Ảnh Hero (Desktop)".
+        - Thêm field hardcoded "Ảnh Hero (Mobile)" cùng pattern (ImageUploadField + Save button).
 - **Test Results**:
     - `npm run build` → ✓ Compiled successfully + 27/27 pages OK.
     - Static verification 11/11 pass:
       ```
-      PASS  Marked use client
-      PASS  Imports useEffect/useRef/useState
-      PASS  IntersectionObserver used
-      PASS  Threshold 0.5
-      PASS  Disconnect after first intersection
-      PASS  Show second after 400ms
-      PASS  Hide second after 1800ms
-      PASS  Conditional opacity-0 on primary image
-      PASS  Conditional opacity-100 on hover image
-      PASS  Cleanup disconnects + clears timers
-      PASS  Skips when only one image (hoverImage === primaryImage)
+      PASS  Hero reads hero_image_mobile
+      PASS  Hero: mobile image hidden on md+
+      PASS  Hero: desktop image hidden on <md
+      PASS  Hero: mobileSrc fallback to desktop
+      PASS  Hero: desktopSrc fallback to mobile
+      PASS  Admin: hint mentions 1080x1920
+      PASS  Admin: hint mentions 9:16
+      PASS  Admin: ImageUploadField for hero_image_mobile
+      PASS  Admin: save button calls saveContentKey hero_image_mobile
+      PASS  Admin: IMAGE_HINTS has hero_image_mobile entry
+      PASS  Migration: INSERT hero_image_mobile row
       ```
-- **Verification cần làm trên iPhone**: mở Trang chủ, cuộn xuống "Sản phẩm nổi bật" → mỗi card hiện ảnh 1 → tự fade sang ảnh 2 (~400ms sau khi vào view) → giữ ~1.4s → fade về ảnh 1. Cuộn lên xuống lại không cycle nữa. Trên desktop, hover vẫn hoạt động như cũ.
+- **Verification cần làm** (sau khi Vercel deploy):
+    - Vào `/admin/noi-dung` → upload 1 ảnh dọc 1080×1920 vào field "Ảnh Hero (Mobile)" → Lưu.
+    - Mở Trang chủ trên iPhone → thấy ảnh dọc fit khít màn hình.
+    - Mở trên desktop → thấy ảnh ngang như cũ.
