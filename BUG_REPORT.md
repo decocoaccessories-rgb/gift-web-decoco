@@ -1,6 +1,35 @@
 # Báo cáo Lỗi
 ## Trạng thái
-THÀNH CÔNG (Hotfix #5b: kill Fabric drag-select để long-press không bị range)
+THÀNH CÔNG (Hotfix #5c: double-tap mobile + long-press select word + sync textarea)
+
+## [Hotfix #5c] 3 vấn đề mới sau 5b
+1. **Double-tap không selectAll**: Fabric `mousedblclick` chỉ fire từ native browser `dblclick` (`node_modules/fabric/dist/index.js:12136`). Mobile Safari KHÔNG dispatch `dblclick` reliable cho touch → override `doubleClickHandler` của ta không bao giờ được gọi.
+   - **Fix**: detect double-tap thủ công trong `mouse:down` handler (2 taps trong 300ms + cách nhau < 40 scene-px).
+2. **Long-press hiện chỉ bôi đen 1 chữ cái** (idx → idx+1), user muốn 1 từ.
+   - **Fix**: dùng `t.selectWord(idx)` (`fabric/dist/index.js:16837`). Hàm này tự `searchWordBoundary` 2 chiều và gọi `_updateTextarea` + `renderCursorOrSelection`.
+3. **Backspace từ keyboard xoá chữ đầu tiên thay vì chữ trước cursor**: khi ta tự set `selectionStart/End` thủ công cho cursor follow, hidden textarea (Fabric L17318) không được sync → `selectionStart/End` của textarea vẫn là 0/0 → keyboard input handler đọc từ textarea → tác động ở vị trí 0.
+   - **Fix**: gọi `t._updateTextarea()` (L16958) sau mỗi lần set selectionStart/End thủ công. Hàm này sync `hiddenTextarea.selectionStart/End` với IText state.
+
+### Test Results (5c)
+- `npm run build` → ✓ Compiled successfully + 27/27 pages OK.
+- Static verification 10/10 pass:
+  ```
+  PASS  Manual double-tap detection in mouse:down
+  PASS  Double-tap calls selectAll
+  PASS  Long-press calls selectWord (not selectionEnd=idx+1)
+  PASS  No more idx+1 single-char selection
+  PASS  moveCursorTo calls _updateTextarea after setting selection
+  PASS  DOUBLE_TAP_MS=300
+  PASS  DOUBLE_TAP_PX2=40*40
+  PASS  Fabric: selectWord exists
+  PASS  Fabric: _updateTextarea exists
+  PASS  Fabric: dblclick gated on native event
+  ```
+
+### Verification cần làm trên iPhone (sau khi Vercel deploy)
+1. Thêm chữ → tap để vào edit mode → tap 2 lần nhanh (trong 300ms) → bôi đen TOÀN BỘ chữ.
+2. Trong edit mode, giữ ngón tay yên ~0.5s trên 1 từ → cả TỪ đó được bôi đen (không phải 1 chữ cái).
+3. Hold + drag → cursor chạy theo ngón tay; nhấn nút Backspace trên bàn phím → chữ TRƯỚC CURSOR bị xoá (không còn xoá chữ đầu tiên).
 
 ## [Hotfix #5] Mobile touch interactions cho IText editing
 ### Yêu cầu

@@ -222,10 +222,14 @@ export default function DesignToolCanvas({
       canvas.on("selection:cleared", hideGuides);
 
       // Touch behavior on IText in edit mode:
-      // - drag (any time while pressing) → cursor follows finger (single position)
-      // - hold ~400ms without dragging → select 1 character at finger
-      // - after long-press, the 1-char selection persists until the finger
-      //   moves more than ~25 scene-px away (then it collapses back to a
+      // - 2 quick taps within 300ms → select ALL text (mobile Safari does not
+      //   reliably fire native dblclick, so we detect it manually here)
+      // - drag while pressing → cursor follows finger (single position);
+      //   hidden textarea is kept in sync via _updateTextarea so backspace
+      //   acts at the cursor position, not at index 0
+      // - hold ~400ms without dragging → select the WORD at the touch point
+      // - after long-press, the word selection persists until the finger
+      //   moves more than ~25 scene-px away (then it collapses to a
       //   single-position cursor that follows the finger)
       type ITextLike = {
         isEditing?: boolean;
@@ -235,13 +239,20 @@ export default function DesignToolCanvas({
         selectionEnd?: number;
         getSelectionStartFromPointer?: (e: MouseEvent | TouchEvent) => number;
         renderCursorOrSelection?: () => void;
+        selectAll?: () => void;
+        selectWord?: (idx: number) => void;
+        _updateTextarea?: () => void;
       };
       let isPressed = false;
       let pressTimer: ReturnType<typeof setTimeout> | null = null;
       let longPressActive = false;
       let longPressOrigin: { x: number; y: number } | null = null;
+      let lastTapTime = 0;
+      let lastTapPoint: { x: number; y: number } | null = null;
       const LONG_PRESS_MS = 400;
       const HOLD_THRESHOLD_PX2 = 25 * 25;
+      const DOUBLE_TAP_MS = 300;
+      const DOUBLE_TAP_PX2 = 40 * 40;
       const clearPressTimer = () => {
         if (pressTimer) {
           clearTimeout(pressTimer);
@@ -253,12 +264,33 @@ export default function DesignToolCanvas({
         const idx = t.getSelectionStartFromPointer(e);
         t.selectionStart = idx;
         t.selectionEnd = idx;
+        t._updateTextarea?.();
         t.renderCursorOrSelection?.();
         canvas.requestRenderAll();
       };
       canvas.on("mouse:down", (opt) => {
         const t = opt.target as ITextLike | undefined;
         if (!t || (t.type !== "i-text" && t.type !== "text") || !t.isEditing) return;
+        const now = Date.now();
+        const sp = opt.scenePoint;
+        if (sp && lastTapPoint && now - lastTapTime < DOUBLE_TAP_MS) {
+          const dx = sp.x - lastTapPoint.x;
+          const dy = sp.y - lastTapPoint.y;
+          if (dx * dx + dy * dy < DOUBLE_TAP_PX2) {
+            clearPressTimer();
+            isPressed = false;
+            longPressActive = false;
+            longPressOrigin = null;
+            lastTapTime = 0;
+            lastTapPoint = null;
+            t.selectAll?.();
+            t.renderCursorOrSelection?.();
+            canvas.requestRenderAll();
+            return;
+          }
+        }
+        lastTapTime = now;
+        lastTapPoint = sp ? { x: sp.x, y: sp.y } : null;
         isPressed = true;
         longPressActive = false;
         longPressOrigin = null;
@@ -266,13 +298,10 @@ export default function DesignToolCanvas({
         pressTimer = setTimeout(() => {
           pressTimer = null;
           longPressActive = true;
-          if (typeof t.getSelectionStartFromPointer !== "function") return;
+          if (typeof t.getSelectionStartFromPointer !== "function" || typeof t.selectWord !== "function") return;
           const idx = t.getSelectionStartFromPointer(opt.e as MouseEvent);
-          const len = t.text?.length ?? 0;
-          t.selectionStart = idx;
-          t.selectionEnd = Math.min(idx + 1, len);
-          longPressOrigin = opt.scenePoint ? { x: opt.scenePoint.x, y: opt.scenePoint.y } : null;
-          t.renderCursorOrSelection?.();
+          t.selectWord(idx);
+          longPressOrigin = sp ? { x: sp.x, y: sp.y } : null;
           canvas.requestRenderAll();
         }, LONG_PRESS_MS);
       });
@@ -280,9 +309,6 @@ export default function DesignToolCanvas({
         const t = (opt.target ?? canvas.getActiveObject()) as ITextLike | undefined;
         if (!t || (t.type !== "i-text" && t.type !== "text") || !t.isEditing) return;
         if (!isPressed) return;
-        // Hold the 1-char selection right after long-press fires until the
-        // finger moves enough — this keeps the highlight stable when the
-        // user is holding still.
         if (longPressActive && longPressOrigin && opt.scenePoint) {
           const dx = opt.scenePoint.x - longPressOrigin.x;
           const dy = opt.scenePoint.y - longPressOrigin.y;
