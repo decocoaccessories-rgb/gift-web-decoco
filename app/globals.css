@@ -153,7 +153,13 @@
   background: var(--muted-foreground);
 }
 
-/* Prevent iOS Safari auto-zoom on Fabric IText editing (textarea must be >= 16px) */
+/* Fabric IText hidden textarea — pinned to viewport so iOS Safari does not
+   scroll the page when keyboard opens (font-size must be >= 16px to also
+   disable iOS auto-zoom). Textarea stays invisible via Fabric's inline
+   opacity:0 + 1x1 px size. */
 textarea[data-fabric="textarea"] {
   font-size: 16px !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
 }

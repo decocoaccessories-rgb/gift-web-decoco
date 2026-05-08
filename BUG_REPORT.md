@@ -1,86 +1,96 @@
 # Báo cáo Lỗi
 ## Trạng thái
-THÀNH CÔNG (Đã sửa lỗi Zoom khi sửa chữ)
+THÀNH CÔNG (Đã sửa shifting + dots robust)
 
 ## Tiêu đề Lỗi
-[NGHIÊM TRỌNG] Điểm neo biến mất và lỗi tự động Zoom/Thu nhỏ khi sửa chữ trên Mobile.
+[NGHIÊM TRỌNG] 4 chấm tròn vẫn mất và màn hình bị dịch chuyển khi sửa chữ.
 
 ## Mô tả Lỗi
-1. **Lỗi điểm neo**: Các chấm tròn điều khiển (dots) không hiển thị khi chọn ảnh/chữ trên Mobile.
-2. **Lỗi Zoom khi sửa chữ**: 
-   - Khi click vào đối tượng chữ để sửa: Vùng hiển thị bị "thu nhỏ" hoặc canvas bị đẩy lệch (do trình duyệt tự động zoom vào textarea ẩn).
-   - Khi xoá dần chữ: Vùng hiển thị lại được "zoom to" ra hoặc quay về trạng thái cũ.
-   - Hiện tượng này gây mất phương hướng và khó khăn cho người dùng khi nhập nội dung.
+1. **4 Chấm tròn**: Vẫn chưa hiển thị màu burgundy ở 4 góc đối tượng.
+2. **Dịch chuyển màn hình (Shifting)**: 
+   - Sau khi fix font-size 16px, hiện tượng Zoom đã hết.
+   - Tuy nhiên, khi click sửa chữ, toàn bộ trang web bị đẩy lên trên (scroll up) quá mức, khiến khu vực canvas bị khuất khỏi màn hình, chỉ còn thấy phần trắng hoặc footer.
+   - Khi bàn phím hiện lên, người dùng không còn nhìn thấy vùng mình đang sửa.
 
 ## Các bước tái hiện
-1. Truy cập Trang sản phẩm trên iPhone (Safari).
-2. Thêm một đối tượng chữ.
-3. Chạm vào chữ để bắt đầu nhập liệu -> Quan sát hiện tượng "thu nhỏ" của canvas/viewport.
-4. Xoá trắng hoặc xoá bớt chữ -> Quan sát hiện tượng viewport tự động "zoom to" lại.
+1. Truy cập Trang sản phẩm trên iPhone.
+2. Thêm đối tượng chữ.
+3. Chạm vào chữ để sửa.
+4. **Kết quả**: Bàn phím hiện lên, trang web tự động cuộn lên trên làm mất dấu vùng canvas.
 
 ## Kết quả Thực tế vs Kết quả Mong đợi
-- **Thực tế**: Viewport nhảy tỷ lệ (zoom in/out) liên tục trong quá trình gõ phím.
-- **Mong đợi**: Viewport giữ nguyên tỷ lệ, không tự động phóng to/thu nhỏ khi bàn phím hiện lên.
-
-## Ngữ cảnh & Môi trường
-- Trình duyệt: Mobile Safari (iOS).
-- Hành vi đặc thù: iOS Auto-zoom trên trường nhập liệu.
+- **Thực tế**: Trang bị cuộn (shift) làm mất vùng thiết kế.
+- **Mong đợi**: Màn hình giữ nguyên hoặc chỉ cuộn nhẹ để vừa đủ thấy vùng đang nhập liệu, không được đẩy canvas ra khỏi tầm mắt.
 
 ---
 
 ## Phân tích Nguyên nhân Gốc rễ (Root Cause Analysis)
-1. **Lỗi Zoom (Nguyên nhân chính)**: Mobile Safari có cơ chế tự động phóng to vào các phần tử `<input>` hoặc `<textarea>` nếu chúng có `font-size` nhỏ hơn **16px**. Fabric.js sử dụng một textarea ẩn (`.fabric-canvas-container textarea`) để xử lý gõ phím. Vì font-size mặc định của textarea này thường nhỏ, iOS sẽ ép zoom viewport.
-2. **Hành vi thu nhỏ/phóng to**: 
-   - Khi nhập chữ: iOS zoom vào textarea -> người dùng thấy canvas bị đẩy đi hoặc nhỏ lại so với khung nhìn.
-   - Khi xoá chữ: Logic nội bộ của Fabric cập nhật kích thước textarea ẩn, có thể trigger trình duyệt tính toán lại vùng zoom.
-3. **Lỗi điểm neo (Dots)**: 
-   - Vẫn liên quan đến việc bù trừ tỷ lệ `scale` trong `ResizeObserver`. Nếu `scale` bị thay đổi liên tục do zoom của trình duyệt, các điểm neo sẽ bị tính toán sai kích thước hoặc vị trí, dẫn đến việc chúng biến mất.
+1. **Lỗi Dịch chuyển (Page Shift)**: Mặc dù đã chặn được Zoom bằng font-size 16px, nhưng trình duyệt vẫn cố gắng thực hiện hành vi "Scroll into view" để đảm bảo ô nhập liệu (textarea ẩn của Fabric) nằm trên bàn phím. Do vị trí textarea ẩn này có thể đang bám theo vị trí chữ trên canvas (vốn có kích thước lớn 1772x1535), trình duyệt cuộn trang lên để "đưa" cái textarea đó lên trên, dẫn đến việc canvas bị đẩy đi.
+2. **Lỗi 4 chấm tròn (Dots)**: 
+   - Có thể do Fabric v7 quản lý control thông qua các object riêng biệt (`fabric.Control`). Việc set prototype `cornerSize` không ép các control này tính toán lại kích thước nếu chúng đã được "cached".
+   - Cần can thiệp sâu hơn vào thuộc tính `controls` của từng object.
 
-**Sơ đồ luồng lỗi Zoom:**
+**Sơ đồ luồng dịch chuyển:**
 ```ascii
-[User Clicks Text] -> [Fabric focuses hidden Textarea] -> [iOS checks font-size]
-       |                                                    |
-       |                                          /---------+---------\
-       |                                       [< 16px]             [>= 16px]
-       |                                          |                    |
-       |                                   [iOS Viewport Zoom]      [Stay Still]
-       |                                          |                    |
-       |                                [Canvas looks shifted]      [SUCCESS]
+[Focus Text] -> [Hidden Textarea positioned at Canvas X,Y] 
+       |                                |
+       |                  [Keyboard Pops Up]
+       |                                |
+       |           [Browser detects Textarea is "under" Keyboard]
+       |                                |
+       |               [Browser Scrolls Page UP to compensate]
+       |                                |
+       \----------------------> [CANVAS OFF-SCREEN]
 ```
 
-## Đề xuất Sửa lỗi (Proposed Fixes — đã refined)
-1. **Ngăn chặn iOS Zoom (Khuyến nghị)**:
-   - Kiểm tra source `node_modules/fabric/dist/index.js:17318-17330` xác nhận:
-     - Fabric tạo textarea ẩn với `data-fabric="textarea"`, append vào `document.body` (KHÔNG nằm trong `.canvas-container`).
-     - Inline style: `font-size: 1px` → đây là trigger iOS auto-zoom (Safari zoom mọi input có font < 16px).
-   - **Fix đúng**: thêm CSS global trong `app/globals.css`:
+## Đề xuất Sửa lỗi (Proposed Fixes — refined)
+1. **Xử lý Dịch chuyển (Shifting)**:
+   - **Selector phải là `textarea[data-fabric="textarea"]`** (textarea ẩn nằm ở `document.body`, không trong `.canvas-container`).
+   - Verify trong source `node_modules/fabric/dist/index.js:16993-16998`: Fabric gọi `updateTextareaPosition()` mỗi khi gõ phím — set `hiddenTextarea.style.left = ...` / `.top = ...` (không kèm `!important`), nên CSS `!important` sẽ thắng.
+   - **Fix**: Thêm vào `app/globals.css`:
      ```css
      textarea[data-fabric="textarea"] {
        font-size: 16px !important;
+       position: fixed !important;
+       top: 0 !important;
+       left: 0 !important;
      }
      ```
-   - Selector `[data-fabric="textarea"]` chính xác hơn `.canvas-container textarea` (vì textarea nằm ở body level, không trong canvas-container).
-   - **KHÔNG** dùng `<meta viewport maximum-scale=1>` — phá pinch-zoom của user, ảnh hưởng accessibility toàn site.
-2. **Lỗi "Dots biến mất khi sửa chữ"**:
-   - Đây **không phải bug**. Fabric IText ẩn selection controls khi vào editing mode (cố ý — để không che chữ đang gõ).
-   - Sau khi gõ xong, click ngoài hoặc nhấn Esc → controls hiện lại. Không cần sửa.
+   - Cố định ở `top:0` (luôn trên keyboard) → Safari thấy textarea đã visible → không cần scroll → canvas không bị đẩy ra khỏi tầm mắt.
+   - Textarea vẫn `opacity: 0; width:1px; height:1px` (giữ inline) → vô hình; cursor và text vẽ trực tiếp trên canvas bởi Fabric, không phụ thuộc vị trí textarea.
+
+2. **Sửa triệt để 4 chấm tròn**:
+   - Verify trong source `node_modules/fabric/dist/src/controls/Control.d.ts:73-85`: `Control.sizeX/sizeY` default `null` → fallback về `object.cornerSize`. Nên prototype + `obj.set({cornerSize})` đáng lẽ đủ. Nhưng để chắc chắn (chống cache hoặc edge case), bổ sung:
+     - Lặp `Object.values(obj.controls)` set `sizeX = sizeY = cornerSize` trực tiếp.
+     - Cập nhật cả `touchCornerSize` (touch hit area, mặc định 24).
+     - Thêm event `canvas.on("object:added", …)` áp size cho object mới (defensive — đảm bảo size luôn đúng dù prototype có race condition).
 
 ## Kế hoạch Xác minh
-1. **Kiểm tra Zoom**: Test trên iPhone thực tế, đảm bảo khi click vào chữ, bàn phím hiện lên nhưng màn hình không bị nhảy/phóng to.
-2. **Kiểm tra Dots**: Xác nhận 4 chấm tròn burgundy luôn xuất hiện sau khi gõ chữ xong.
-3. **Kiểm tra Xoá chữ**: Đảm bảo xoá chữ không gây rung lắc màn hình.
+1. **Test Shifting**: Đảm bảo khi gõ chữ, canvas vẫn nằm trong tầm mắt.
+2. **Test Dots**: 4 chấm tròn phải to, rõ, màu burgundy trên mọi thiết bị.
 
-## Hotfix #2 — iOS Safari auto-zoom khi sửa text (2026-05-08)
+## Hotfix #3 — Page shifting + dots robust (2026-05-08)
 - **Files Changed**:
-    - `app/globals.css`: thêm rule `textarea[data-fabric="textarea"] { font-size: 16px !important; }`.
-- **Cơ chế**:
-    - Fabric tạo textarea ẩn (1×1 px, opacity 0) gắn `data-fabric="textarea"`, append vào `document.body`. Inline style: `font-size: 1px`.
-    - Mobile Safari thấy `font-size < 16px` trên input/textarea khi focus → auto-zoom viewport (không phải Fabric/canvas vấn đề).
-    - Override `font-size: 16px !important` không ảnh hưởng render text trên canvas (textarea vô hình, opacity 0), chỉ vô hiệu hoá iOS auto-zoom.
+    - `app/globals.css`: bổ sung `position: fixed; top:0; left:0` cho `textarea[data-fabric="textarea"]`. Pin textarea ẩn về góc trái-trên viewport → Safari thấy textarea đã visible khi focus → không cần scroll page → canvas không bị đẩy đi.
+    - `components/DesignTool/DesignToolCanvas.tsx`:
+        - Thêm `scaleRef` đồng bộ với state `scale` (tránh stale closure).
+        - Trong `useEffect([scale])`: thêm `touchCornerSize`, lặp `obj.controls` set trực tiếp `sizeX/sizeY = cornerSize` cho mỗi control (defensive — chống cache/edge case của Fabric Control).
+        - Thêm event listener `canvas.on("object:added", …)` áp size scale-compensated cho object mới ngay khi được thêm vào canvas (đảm bảo size đúng dù prototype có chậm cập nhật).
 - **Test Results**:
-    - `npm run build` → ✓ Compiled successfully + Generating static pages 27/27 OK.
-    - Static verification: selector + `!important` đúng vị trí; xác nhận Fabric v7.3.1 vẫn dùng `data-fabric="textarea"` attribute → 3/3 pass.
-- **Verification**: Cần test trên iPhone Safari thực để xác nhận viewport không nhảy khi tap vào text.
-
-## Lưu ý — "Dots biến mất khi đang sửa chữ"
-Đây **KHÔNG** phải bug. Fabric IText cố ý ẩn selection controls khi vào editing mode để không che ký tự đang gõ. Click ngoài/Esc để thoát editing → chấm tròn hiện lại. Không cần sửa.
+    - `npm run build` → ✓ Compiled successfully + 27/27 static pages OK.
+    - Static verification 12/12 pass:
+      ```
+      PASS  CSS: position fixed on Fabric textarea
+      PASS  CSS: top:0 !important on Fabric textarea
+      PASS  CSS: left:0 !important on Fabric textarea
+      PASS  CSS: font-size 16px (zoom prevention)
+      PASS  TSX: scaleRef declared
+      PASS  TSX: scaleRef synced in scale effect
+      PASS  TSX: object:added listener for sizes
+      PASS  TSX: per-control sizeX assignment
+      PASS  TSX: per-control sizeY assignment
+      PASS  TSX: touchCornerSize set
+      PASS  Fabric: still appends to body, data-fabric textarea
+      PASS  Fabric: updateTextareaPosition mutates style.left/top
+      ```
+- **Verification**: Cần test trên iPhone thực sau khi Vercel deploy: (a) tap vào chữ — viewport đứng yên; (b) upload ảnh và chọn — 4 chấm burgundy hiện rõ ở 4 góc.

@@ -47,6 +47,7 @@ export default function DesignToolCanvas({
   const isUndoRedoRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const scaleRef = useRef(1);
 
   const [selectedFrame, setSelectedFrame] = useState<
     Pick<Frame, "id" | "name" | "thumbnail_url" | "config"> | null
@@ -112,6 +113,25 @@ export default function DesignToolCanvas({
       canvas.on("object:modified", saveSnapshot);
       canvas.on("object:added", saveSnapshot);
       canvas.on("object:removed", saveSnapshot);
+
+      // Defensive: ensure new objects pick up scale-compensated control sizes
+      canvas.on("object:added", (e) => {
+        const obj = e.target as unknown as {
+          set: (p: object) => void;
+          controls?: Record<string, { sizeX: number; sizeY: number }>;
+        };
+        if (!obj || typeof obj.set !== "function") return;
+        const inv = 1 / Math.max(scaleRef.current, 0.05);
+        const cornerSize = Math.round(16 * inv);
+        const borderScaleFactor = Math.max(2, Math.round(2 * inv));
+        obj.set({ cornerSize, touchCornerSize: cornerSize, borderScaleFactor });
+        if (obj.controls) {
+          Object.values(obj.controls).forEach((c) => {
+            c.sizeX = cornerSize;
+            c.sizeY = cornerSize;
+          });
+        }
+      });
 
       // Center alignment guides (gold dashed lines + soft snap)
       const SNAP_THRESHOLD = 8;
@@ -260,6 +280,7 @@ export default function DesignToolCanvas({
 
   // Compensate for CSS scale so selection dots stay ~16px on screen at any viewport
   useEffect(() => {
+    scaleRef.current = scale;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const inv = 1 / Math.max(scale, 0.05);
@@ -267,11 +288,19 @@ export default function DesignToolCanvas({
     const borderScaleFactor = Math.max(2, Math.round(2 * inv));
     import("fabric").then(({ FabricObject }) => {
       FabricObject.prototype.cornerSize = cornerSize;
+      FabricObject.prototype.touchCornerSize = cornerSize;
       FabricObject.prototype.borderScaleFactor = borderScaleFactor;
     });
-    canvas.getObjects().forEach((o) => {
-      o.set({ cornerSize, borderScaleFactor });
-    });
+    const applySizes = (obj: { set: (p: object) => void; controls?: Record<string, { sizeX: number; sizeY: number }> }) => {
+      obj.set({ cornerSize, touchCornerSize: cornerSize, borderScaleFactor });
+      if (obj.controls) {
+        Object.values(obj.controls).forEach((c) => {
+          c.sizeX = cornerSize;
+          c.sizeY = cornerSize;
+        });
+      }
+    };
+    canvas.getObjects().forEach(applySizes);
     canvas.requestRenderAll();
   }, [scale]);
 
