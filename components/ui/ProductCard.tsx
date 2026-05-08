@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
 import type { Product } from "@/lib/supabase/types";
@@ -14,8 +17,36 @@ export default function ProductCard({ product }: ProductCardProps) {
   const hoverImage = images[1] ?? images[0] ?? null;
   const outOfStock = product.stock === 0;
 
+  const cardRef = useRef<HTMLAnchorElement>(null);
+  const [showSecond, setShowSecond] = useState(false);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || !hoverImage || hoverImage === primaryImage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        observer.disconnect();
+        const inTimer = window.setTimeout(() => setShowSecond(true), 400);
+        const outTimer = window.setTimeout(() => setShowSecond(false), 1800);
+        cleanupTimers = () => {
+          window.clearTimeout(inTimer);
+          window.clearTimeout(outTimer);
+        };
+      },
+      { threshold: 0.5 }
+    );
+    let cleanupTimers: (() => void) | null = null;
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      cleanupTimers?.();
+    };
+  }, [hoverImage, primaryImage]);
+
   return (
     <Link
+      ref={cardRef}
       href={`/san-pham/${product.slug}`}
       className="group relative flex flex-col rounded-xl overflow-hidden border border-border bg-card hover:shadow-md transition-shadow duration-300"
     >
@@ -28,7 +59,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               alt={product.name}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-              className="object-cover transition-opacity duration-500 group-hover:opacity-0"
+              className={`object-cover transition-opacity duration-500 group-hover:opacity-0 ${showSecond ? "opacity-0" : ""}`}
             />
             {hoverImage && (
               <Image
@@ -36,7 +67,7 @@ export default function ProductCard({ product }: ProductCardProps) {
                 alt={`${product.name} - alternate`}
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                className="object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100"
+                className={`object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${showSecond ? "opacity-100" : ""}`}
               />
             )}
           </>
