@@ -1,6 +1,6 @@
 # Báo cáo Lỗi
 ## Trạng thái
-THÀNH CÔNG (Hotfix #5: mobile touch text-editing UX)
+THÀNH CÔNG (Hotfix #5b: kill Fabric drag-select để long-press không bị range)
 
 ## [Hotfix #5] Mobile touch interactions cho IText editing
 ### Yêu cầu
@@ -43,6 +43,41 @@ Trên mobile, trong Công cụ thiết kế:
 2. Ở trạng thái edit, giữ ngón tay yên trên 1 chữ ~0.5s → chữ đó được bôi đen.
 3. Trong khi đang giữ, kéo ngón tay sang chữ khác → cursor (vạch nháy) chạy theo ngón tay.
 4. Tap rồi kéo nhanh (không giữ) → vẫn drag-select range như mặc định Fabric (không bị phá).
+
+## Hotfix #5b — Disable Fabric drag-select (2026-05-08)
+- **User report**: "giữ tay và di chuyển thì vẫn là bôi đen chữ từ chỗ tôi bắt đầu chạm tay đến chữ mà tôi di tay qua".
+- **Phát hiện root cause**:
+    - Verify `node_modules/fabric/dist/index.js:12517`: trong `__onMouseMove`, Fabric gọi `this.textEditingManager.onMouseMove(e)` TRƯỚC khi emit `mouse:move`.
+    - `textEditingManager.onMouseMove` (L11767) gọi `target.updateSelectionOnMouseMove(e)` (L16897) — đây mới là chỗ Fabric mở rộng selectionEnd theo finger → tạo range "từ điểm chạm đến điểm hiện tại".
+    - Listener `canvas.on("mouse:move")` của ta chạy SAU, nhưng nếu finger di chuyển quá MOVE_CANCEL_PX2 (30 scene-px ≈ 10 screen-px) trước khi timer 400ms bắn → `pressTimer` bị huỷ → `longPressActive = false` mãi → handler chỉ no-op → Fabric range giữ nguyên.
+    - Trên mobile, finger jitter dễ vượt 10 screen-px → dễ rơi vào case này.
+- **Fix mới (Hotfix #5b)**:
+    - **Override `IText.prototype.updateSelectionOnMouseMove` thành no-op** → vô hiệu hoá Fabric drag-select hoàn toàn. Cursor giờ do canvas mouse handler của ta quản lý 100%.
+    - Logic mới đơn giản hơn:
+        - mousedown trên IText.isEditing → start 400ms timer.
+        - mousemove khi `isPressed`: cursor follow finger (single-pos, không range).
+        - timer fires → `selectionStart=idx, selectionEnd=idx+1` (bôi 1 chữ), lưu `longPressOrigin`.
+        - sau long-press, mousemove giữ 1-char selection nếu finger chưa di chuyển > 25 scene-px; vượt threshold → cursor follow finger (range collapse).
+        - mouseup → reset state.
+    - Bỏ logic `MOVE_CANCEL_PX2` (timer luôn bắn — không cần huỷ vì Fabric drag-select đã chết).
+
+### Test Results (5b)
+- `npm run build` → ✓ Compiled successfully + 27/27 pages OK.
+- Static verification 9/9 pass:
+  ```
+  PASS  Override updateSelectionOnMouseMove to no-op
+  PASS  Override doubleClickHandler to selectAll
+  PASS  Helper moveCursorTo collapses selection
+  PASS  mouse:move uses moveCursorTo when pressed
+  PASS  HOLD_THRESHOLD_PX2 defined
+  PASS  No more MOVE_CANCEL_PX2 cancel logic
+  PASS  mouse:up resets isPressed and longPressActive
+  PASS  Fabric: updateSelectionOnMouseMove still in source (target of override)
+  PASS  Fabric: textEditingManager calls updateSelectionOnMouseMove
+  ```
+- **Lưu ý hành vi sau Hotfix 5b**:
+    - Drag-select range của Fabric đã bị **vô hiệu hoá globally** cho IText. Nếu sau này muốn drag-select range trở lại (ví dụ trên desktop), cần khôi phục `updateSelectionOnMouseMove` (hoặc gating theo touch device).
+    - Tap + drag bây giờ luôn = cursor follow finger (single-pos). Đây là behavior phù hợp cho design tool text ngắn.
 
 ## Tiêu đề Lỗi
 [TIẾP TỤC] 4 chấm tròn vẫn mất, màn hình dịch chuyển và lỗi không đổi Font chữ.
