@@ -647,10 +647,14 @@ export default function DesignToolCanvas({
         body: JSON.stringify({ dataUrl }),
       });
 
-      let designImageUrl: string | undefined;
-      if (res.ok) {
-        const json = await res.json();
-        designImageUrl = json.url;
+      const json = await res.json().catch(() => null);
+      const designImageUrl: string | undefined = json?.url;
+      if (!res.ok || !designImageUrl) {
+        console.error("Design export failed:", { status: res.status, body: json });
+        alert(
+          "Không tải được ảnh thiết kế lên máy chủ. Vui lòng thử lại hoặc liên hệ hỗ trợ."
+        );
+        return;
       }
 
       // Save to sessionStorage

@@ -39,8 +39,10 @@ export async function POST(request: NextRequest) {
 
   if (uploadError) {
     console.error("Storage upload error:", uploadError);
-    // Return without URL — order can still be placed without design image
-    return NextResponse.json({ url: null, error: "Upload failed" }, { status: 200 });
+    return NextResponse.json(
+      { error: "Upload failed", detail: uploadError.message },
+      { status: 500 }
+    );
   }
 
   const { data: urlData } = supabase.storage.from("designs").getPublicUrl(path);
