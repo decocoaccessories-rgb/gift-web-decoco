@@ -1,7 +1,7 @@
 # Báo cáo Lỗi
 
 ## Trạng thái
-ĐÃ SỬA CHỮA (Lần 2) — Thành công, đợi verify trên production
+ĐÃ SỬA CHỮA — Thành công, verified trên production
 
 ## Tiêu đề Lỗi
 Đơn hàng không có ảnh thiết kế để tải về (Mã đơn: DCO-20260510-1E68)
@@ -165,4 +165,17 @@ Canvas xuất ra 1772×1535×multiplier 2 = 3544×3070, PNG có thể 5–15MB. 
 ### Test (lần 2)
 - `node scripts/test-design-export-fix.mjs`: **Thành công** — 12/12 PASS (thêm test cho FormData và backwards-compat JSON).
 - `npm run build`: **Thành công** — Compiled in 23.3s, 27/27 pages generated.
-- Production smoke test (sau deploy): xem section "Verify production" bên dưới.
+
+### Verify production (sau deploy commit `56e0da5`)
+
+```
+small     (0.5MB binary) -> 200 OK
+realistic (3MB   binary) -> 200 OK
+large     (4MB   binary) -> 200 OK   <-- trước đó: 4MB JSON = 413
+```
+
+Cùng kích cỡ ảnh 4MB:
+- Trước fix: JSON dataURL → body 5.3MB sau base64 → `413 FUNCTION_PAYLOAD_TOO_LARGE`.
+- Sau fix: binary multipart → body ≈4MB → `200 OK`, file lên Supabase Storage.
+
+Người dùng làm thiết kế phức tạp (nhiều ảnh) trên production giờ sẽ tải lên thành công, không còn alert lỗi.
