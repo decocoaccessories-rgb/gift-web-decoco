@@ -1,29 +1,55 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/server";
 
-function dataURLtoBuffer(dataUrl: string): { buffer: Buffer; mimeType: string } | null {
-  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-  if (!match) return null;
+const ALLOWED_MIME = ["image/png", "image/jpeg"] as const;
+const MAX_BYTES = 20 * 1024 * 1024;
+
+async function readImage(
+  request: NextRequest,
+): Promise<{ buffer: Buffer; mimeType: string } | { error: string; status: number }> {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  if (contentType.startsWith("multipart/form-data")) {
+    const formData = await request.formData().catch(() => null);
+    const file = formData?.get("file");
+    if (!(file instanceof Blob)) {
+      return { error: "Missing file", status: 400 };
+    }
+    const mimeType = file.type;
+    if (!ALLOWED_MIME.includes(mimeType as (typeof ALLOWED_MIME)[number])) {
+      return { error: "Invalid image type", status: 400 };
+    }
+    const buffer = Buffer.from(await file.arrayBuffer());
+    if (buffer.length > MAX_BYTES) {
+      return { error: "Image too large", status: 413 };
+    }
+    return { buffer, mimeType };
+  }
+
+  // Backwards-compat: JSON dataURL payload.
+  const body = await request.json().catch(() => null);
+  if (!body?.dataUrl) {
+    return { error: "Missing dataUrl", status: 400 };
+  }
+  const match = (body.dataUrl as string).match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) {
+    return { error: "Invalid image data", status: 400 };
+  }
   const mimeType = match[1];
-  const base64 = match[2];
-  const buffer = Buffer.from(base64, "base64");
+  if (!ALLOWED_MIME.includes(mimeType as (typeof ALLOWED_MIME)[number])) {
+    return { error: "Invalid image data", status: 400 };
+  }
+  const buffer = Buffer.from(match[2], "base64");
+  if (buffer.length > MAX_BYTES) {
+    return { error: "Image too large", status: 413 };
+  }
   return { buffer, mimeType };
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  if (!body?.dataUrl) {
-    return NextResponse.json({ error: "Missing dataUrl" }, { status: 400 });
-  }
-
-  const parsed = dataURLtoBuffer(body.dataUrl as string);
-  if (!parsed || !["image/png", "image/jpeg"].includes(parsed.mimeType)) {
-    return NextResponse.json({ error: "Invalid image data" }, { status: 400 });
-  }
-
-  // 20MB limit (2x canvas = 800x800x2 multiplier ≈ ~5MB typical)
-  if (parsed.buffer.length > 20 * 1024 * 1024) {
-    return NextResponse.json({ error: "Image too large" }, { status: 413 });
+  const parsed = await readImage(request);
+  if ("error" in parsed) {
+    return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
 
   const supabase = createAdminClient();
@@ -41,7 +67,7 @@ export async function POST(request: NextRequest) {
     console.error("Storage upload error:", uploadError);
     return NextResponse.json(
       { error: "Upload failed", detail: uploadError.message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 

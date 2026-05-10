@@ -1,7 +1,7 @@
 # Báo cáo Lỗi
 
 ## Trạng thái
-ĐÃ SỬA CHỮA — Thành công (chờ verify trên môi trường staging)
+ĐÃ SỬA CHỮA (Lần 2) — Thành công, đợi verify trên production
 
 ## Tiêu đề Lỗi
 Đơn hàng không có ảnh thiết kế để tải về (Mã đơn: DCO-20260510-1E68)
@@ -140,3 +140,29 @@ All tests passed.
 ### Lưu ý vận hành
 - Bucket `designs` trên Supabase phải tồn tại và public (đề xuất #3 trong Proposed Fixes). Nếu bucket vẫn thiếu, người dùng giờ sẽ thấy alert thay vì đặt được đơn rỗng.
 - Đơn `DCO-20260510-1E68` đã tạo trước fix vẫn không có ảnh (lịch sử) — fix chỉ áp dụng cho đơn mới.
+
+---
+
+## Phát hiện thêm (sau lần fix #1) — Vercel `FUNCTION_PAYLOAD_TOO_LARGE`
+
+Sau khi deploy fix lần 1, người dùng vẫn thấy alert "Không tải được ảnh thiết kế". Truy nguyên: bucket OK, service role OK, upload local OK — nhưng Vercel function trả `413 FUNCTION_PAYLOAD_TOO_LARGE`. Vercel giới hạn body ~4.5MB cho serverless function.
+
+Probe production:
+- 8MB body → `413 FUNCTION_PAYLOAD_TOO_LARGE`
+- 4MB body (≈3MB JPEG base64) → `200 OK`
+- 5.3MB body (≈4MB JPEG base64) → `413`
+
+Canvas xuất ra 1772×1535×multiplier 2 = 3544×3070, PNG có thể 5–15MB. Sau base64 inflation 33% thì luôn vượt 4.5MB → fail.
+
+### Fix lần 2 (Minimal, vẫn tối thiểu)
+1. **Frontend (`DesignToolCanvas.tsx :: handleExport`)**:
+   - Đổi format export `png` → `jpeg` (q0.92), giữ `multiplier: 2`. Canvas đã có background trắng nên JPEG không mất transparency.
+   - Đổi cách POST: `JSON {dataUrl}` → `multipart/form-data` với `Blob` (binary). Loại bỏ overhead 33% của base64.
+2. **API (`/api/design/export`)**:
+   - Tách logic đọc ảnh thành `readImage()` hỗ trợ cả `multipart/form-data` (path mới) và `application/json` dataURL (giữ tương thích ngược).
+   - Logic upload, error handling, response giữ nguyên.
+
+### Test (lần 2)
+- `node scripts/test-design-export-fix.mjs`: **Thành công** — 12/12 PASS (thêm test cho FormData và backwards-compat JSON).
+- `npm run build`: **Thành công** — Compiled in 23.3s, 27/27 pages generated.
+- Production smoke test (sau deploy): xem section "Verify production" bên dưới.

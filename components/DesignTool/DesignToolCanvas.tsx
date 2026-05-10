@@ -638,13 +638,17 @@ export default function DesignToolCanvas({
     if (!canvas) return;
     setExporting(true);
     try {
-      const dataUrl = canvas.toDataURL({ format: "png", quality: 1, multiplier: 2 });
+      // JPEG q0.92 keeps print quality. Posted as binary multipart to avoid
+      // base64's 33% inflation; PNG/JSON exceeded Vercel's ~4.5MB function body
+      // limit on complex designs.
+      const dataUrl = canvas.toDataURL({ format: "jpeg", quality: 0.92, multiplier: 2 });
+      const blob = await (await fetch(dataUrl)).blob();
+      const formData = new FormData();
+      formData.append("file", blob, "design.jpg");
 
-      // Upload to Supabase Storage via API
       const res = await fetch("/api/design/export", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dataUrl }),
+        body: formData,
       });
 
       const json = await res.json().catch(() => null);
