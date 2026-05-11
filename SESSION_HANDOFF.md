@@ -2,7 +2,7 @@
 
 > Mục đích: file này tóm tắt mọi thứ đã làm trong session để bạn (hoặc Claude session khác) có thể đọc và **tiếp tục ngay** mà không cần đọc lại lịch sử chat.
 >
-> Cập nhật lần cuối: 2026-05-06.
+> Cập nhật lần cuối: 2026-05-11.
 
 ---
 
@@ -13,6 +13,8 @@
 - **Stack**: Next.js 16.2.4 (App Router, Turbopack), React 19, Tailwind CSS v4, Supabase SSR, Base UI, Resend, vnpay@2.5.0.
 - **Branch**: `master` (trunk-based).
 - **Auth GitHub**: hiện đang login bằng tài khoản `decocoaccessories-rgb` qua Windows Credential Manager (đã đổi từ `nguyentienhung2111-pixel`). Nếu push lỗi 403, chạy `cmdkey /delete:git:https://github.com` rồi push lại để re-login.
+- **Auth Vercel**: phải login `decoco.accessories@gmail.com` (team `decocoaccessories-rgbs-projects`, project `gift-web-decoco`). Nếu login nhầm `nguyentienhung2111-pixel`, mọi lệnh `vercel env *` sẽ fail vì team đó chỉ có project `decoco-web` cũ. Kiểm tra trước bằng `vercel whoami` + `vercel teams ls`.
+- **Production domain**: `https://trangsucdecoco.vn` (đã alias vào Vercel project `gift-web-decoco`). PRD trong CLAUDE.md nói "decoco.vn" — outdated, domain thật là `trangsucdecoco.vn`. DNS quản lý ở **Mắt Bão**.
 - **CLAUDE.md**: chứa PRD V2 (đã viết). Project rules nhập từ `AGENTS.md`.
 - **IMPLEMENTATION_PLAN_V2.md**: checklist 5 phase, trạng thái cập nhật khi đi tới phase nào.
 
@@ -23,14 +25,20 @@
 | 0 | Setup (`vnpay` package, env example) | ✅ Done |
 | 1 | Per-variant inventory | ✅ Code done & pushed; chưa smoke test trên Vercel |
 | 2 | VNPAY QR payment | ✅ Code done & pushed; chưa set env, chưa test sandbox |
-| 3 | Email Resend | ✅ Code done & pushed; chưa set RESEND_API_KEY thật |
-| 4 | QA & Deploy | ⏳ Đang ở đây — chờ user cấu hình env Vercel |
+| 3 | Email Resend | ✅ **DONE end-to-end** — domain verified, prod env set, đơn test thực tế trên prod đã gửi mail về `decoco.cskh@gmail.com` (2026-05-11) |
+| 4 | QA & Deploy | ⏳ Email done. VNPAY env + smoke test còn lại. Variant smoke test còn lại. |
 
-**Bug fix riêng (đầu session)**: hero buttons readability — đã fix & push (commit `19c1444`).
+**Bug fix riêng**: hero buttons readability — đã fix & push (commit `19c1444`). Design export fix sau đó (commits `a9a3265`, `56e0da5`, `c9b7ec0`) đã verified trên production.
 
 ## 3. Commits chính trên `master`
 
 ```
+8cd7bd9 chore(env): commit .env.local.example with verified Resend FROM domain
+c9b7ec0 docs(bug-report): add production verification results for design-export fix
+56e0da5 fix(design-export): post canvas as JPEG multipart to avoid Vercel 4.5MB limit
+a9a3265 fix(design-export): surface storage upload failures instead of swallowing them
+fcdcd42 fix: include section/type/label in site_content upsert for hero_image_mobile
+d5772e6 feat(home): separate hero background images for desktop and mobile
 c34ded0 feat: order notification email via resend
 9e1e0e6 feat: vnpay qr payment integration
 aa4d76c feat: per-variant inventory tracking
@@ -92,75 +100,59 @@ paid_at TIMESTAMPTZ
 - `BUG_REPORT.md` — bug fix hero buttons (đã đóng)
 - `scripts/verify-hero-buttons.mjs` — test script cho bug fix
 
-## 7. Env vars cần thiết
+## 7. Env vars
 
-`.env.local.example` đã list (file local, `.gitignore` exclude). Đầy đủ:
+`.env.local.example` giờ **đã được track trong git** (commit `8cd7bd9` — thêm exception cho rule `.env*` trong `.gitignore`). Tham chiếu file đó cho danh sách đầy đủ.
 
-```
-# Supabase (đã có sẵn)
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+**Trạng thái env (2026-05-11):**
 
-# Resend
-RESEND_API_KEY=               # cần lấy từ resend.com/api-keys
-RESEND_FROM_EMAIL=onboarding@resend.dev
-ADMIN_EMAIL=admin@decoco.vn   # legacy
-NOTIFICATION_EMAIL=decoco.cskh@gmail.com
+| Env | Local `.env.local` | Vercel production | Vercel preview |
+|-----|--------------------|-------------------|-----------------|
+| Supabase 3 keys | ✅ | ✅ | ✅ |
+| `RESEND_API_KEY` | ✅ thực | ✅ thực | ❌ chưa set |
+| `RESEND_FROM_EMAIL` | ✅ `noreply@trangsucdecoco.vn` | ✅ `noreply@trangsucdecoco.vn` | ❌ |
+| `NOTIFICATION_EMAIL` | ✅ `decoco.cskh@gmail.com` | ✅ `decoco.cskh@gmail.com` | ❌ |
+| `NEXT_PUBLIC_APP_URL` | ✅ `http://localhost:3000` | ✅ `https://trangsucdecoco.vn` | ❌ |
+| `VNPAY_TMN_CODE` | ❌ | ❌ | ❌ |
+| `VNPAY_HASH_SECRET` | ❌ | ❌ | ❌ |
+| `VNPAY_HOST` | ❌ (mặc định sandbox trong code) | ❌ | ❌ |
+| `VNPAY_RETURN_PATH` | ❌ | ❌ | ❌ |
 
-# App
-NEXT_PUBLIC_APP_URL=          # production: URL Vercel; dev: http://localhost:3000
-
-# VNPAY
-VNPAY_TMN_CODE=               # cần đăng ký sandbox.vnpayment.vn
-VNPAY_HASH_SECRET=            # cần đăng ký sandbox.vnpayment.vn
-VNPAY_HOST=https://sandbox.vnpayment.vn
-VNPAY_RETURN_PATH=/api/payments/vnpay/return
-```
+**Lưu ý preview env**: Vercel CLI 53 không cho `vercel env add NAME preview --yes` non-interactive; CLI đòi git-branch và `master` bị reject vì là production branch. Khi cần test trên feature branch, set qua dashboard.
 
 ## 8. Đang chờ user (resume point)
 
-User chọn **Cách A** để set env trên Vercel: dùng Vercel CLI.
+**Email feature — ✅ DONE**, không còn cần làm gì nữa cho Phase 3.
 
-**Đã làm**: cài `vercel@53.1.1` global qua npm.
+**Còn lại cho Phase 4 đóng V2:**
 
-**User cần làm tiếp** (chạy trong khung chat với prefix `!`):
+### 8a. VNPAY env + sandbox test (chưa làm)
 
-```
-! vercel login          # interactive, mở browser
-! vercel link           # chọn project gift-web-decoco (hoặc tên trên Vercel)
-```
+User cần đăng ký merchant sandbox tại https://sandbox.vnpayment.vn (free) để có:
+- `VNPAY_TMN_CODE`
+- `VNPAY_HASH_SECRET`
 
-Sau đó user phải **paste vào chat** các giá trị:
-
-1. `VNPAY_TMN_CODE` — từ https://sandbox.vnpayment.vn (đăng ký merchant test free)
-2. `VNPAY_HASH_SECRET` — đi cùng TMN code
-3. `RESEND_API_KEY` — từ https://resend.com/api-keys
-4. URL production Vercel (vd `https://gift-web-decoco.vercel.app`)
-
-Khi đã có, Claude (session mới) sẽ chạy:
+Sau khi user paste 2 giá trị vào chat, Claude chạy:
 ```bash
-vercel env add VNPAY_TMN_CODE production
-vercel env add VNPAY_TMN_CODE preview
-vercel env add VNPAY_HASH_SECRET production
-vercel env add VNPAY_HASH_SECRET preview
-vercel env add VNPAY_HOST production            # value: https://sandbox.vnpayment.vn
-vercel env add VNPAY_HOST preview               # value: https://sandbox.vnpayment.vn
-vercel env add VNPAY_RETURN_PATH production     # value: /api/payments/vnpay/return
-vercel env add VNPAY_RETURN_PATH preview        # value: /api/payments/vnpay/return
-vercel env add NEXT_PUBLIC_APP_URL production   # value: <prod URL>
-vercel env add NEXT_PUBLIC_APP_URL preview      # value: <preview URL>
-vercel env add RESEND_API_KEY production
-vercel env add RESEND_API_KEY preview
-vercel env add RESEND_FROM_EMAIL production     # value: onboarding@resend.dev
-vercel env add RESEND_FROM_EMAIL preview        # value: onboarding@resend.dev
-vercel env add NOTIFICATION_EMAIL production    # value: decoco.cskh@gmail.com
-vercel env add NOTIFICATION_EMAIL preview       # value: decoco.cskh@gmail.com
+vercel env add VNPAY_TMN_CODE production --value '<paste>' --yes
+vercel env add VNPAY_HASH_SECRET production --value '<paste>' --yes
+vercel env add VNPAY_HOST production --value 'https://sandbox.vnpayment.vn' --yes
+vercel env add VNPAY_RETURN_PATH production --value '/api/payments/vnpay/return' --yes
 ```
 
-Lệnh `vercel env add` interactive — sẽ prompt nhập value. Có thể dùng pipe: `printf 'value\n' | vercel env add NAME production`.
+Sau đó cấu hình trên VNPAY merchant portal:
+- Return URL: `https://trangsucdecoco.vn/api/payments/vnpay/return`
+- IPN URL: `https://trangsucdecoco.vn/api/payments/vnpay/ipn`
 
-Sau khi set xong → `vercel deploy --prod` (hoặc trigger redeploy trên dashboard) để env mới có hiệu lực.
+Redeploy: `vercel redeploy <latest-prod-url> --target production`.
+
+### 8b. Variant inventory smoke test (chưa làm)
+
+Vào `/admin/san-pham` trên prod, tạo product 2 variants (stock 3 & 5), đặt đơn 1 variant, verify kho giảm đúng variant.
+
+### 8c. Preview env (optional, làm khi cần feature branch)
+
+CLI 53 không cho add preview non-interactive. Set qua dashboard.
 
 ## 9. ⚠️ Quan trọng — VNPAY IPN URL
 
@@ -195,10 +187,11 @@ Khi env Vercel set xong + IPN URL VNPAY cấu hình:
    - Check Vercel logs có IPN GET `/api/payments/vnpay/ipn` → DB `orders.payment_status='paid'`, `paid_at` được set, kho variant giảm.
    - Test fail: cancel ở gateway → `?pay=failed` (banner đỏ), kho không giảm.
 
-3. **Email**:
-   - Đặt bất kỳ đơn (COD hoặc VNPAY) → check inbox `decoco.cskh@gmail.com`.
-   - **Lưu ý**: vì FROM là `onboarding@resend.dev`, email rất có thể vào **Spam folder**.
-   - Production muốn từ `*@decoco.vn` thì cần verify domain trên Resend (DKIM/SPF) — **out of scope V2**.
+3. **Email**: ✅ DONE (2026-05-11).
+   - Domain `trangsucdecoco.vn` đã verified trên Resend (DKIM/SPF/DMARC qua Mắt Bão DNS).
+   - FROM: `noreply@trangsucdecoco.vn` → vào **Inbox** (không Spam).
+   - User đã đặt đơn test trên prod, mail về `decoco.cskh@gmail.com` thành công.
+   - Script smoke test offline: `scripts/test-order-email.mjs` (chạy `node --env-file=.env.local scripts/test-order-email.mjs`).
 
 ## 12. Known gotchas
 
@@ -209,7 +202,8 @@ Khi env Vercel set xong + IPN URL VNPAY cấu hình:
 - **`payment_status='pending'` cho COD**: COD đơn cũng `pending` cho đến khi admin manually đánh dấu trong tương lai. Logic này có thể cần phân biệt rõ hơn (V2.1).
 - **Idempotent IPN**: VNPAY có thể gửi IPN nhiều lần. Code đã handle: lookup `vnp_txn_ref`, nếu đã `paid` trả `InpOrderAlreadyConfirmed`.
 - **`new_features_plan.md`, `product_highlights_plan.md`**: là plan files cũ của user, untracked, không liên quan V2.
-- **`.env.local.example`**: bị `.gitignore` exclude (rule `.env*`). Mọi env vars mới đã document ở `CLAUDE.md` PRD section.
+- **`.env.local.example`**: đã track trong git từ commit `8cd7bd9` (thêm `!.env.local.example` exception trong `.gitignore`). Khi thêm env var mới, update cả file này lẫn `CLAUDE.md`.
+- **Resend test mode**: nếu account Resend chưa verify domain, **chỉ gửi được tới email chủ account** (`decoco.accessories@gmail.com`). FROM `onboarding@resend.dev` cũng dính rule này. Để gửi tới `decoco.cskh@gmail.com` hoặc bất kỳ email khác, BẮT BUỘC verify domain → đổi FROM sang `*@<verified-domain>`. PRD nói "out of scope" — sai, đây là hard prerequisite.
 - **Type safety của `order` trong route**: dùng `as unknown as Order` ở `sendNewOrderEmail` call vì select trả subset cols. Acceptable vì chỉ dùng các field đã được select.
 
 ## 13. Out-of-scope V2 (đã chốt)
@@ -218,7 +212,7 @@ Khi env Vercel set xong + IPN URL VNPAY cấu hình:
 - Cron tự huỷ đơn VNPAY pending
 - MoMo / ZaloPay / Payoo
 - React Email / multi-language
-- Verify domain decoco.vn cho Resend
+- ~~Verify domain decoco.vn cho Resend~~ → **đã làm với `trangsucdecoco.vn`** (2026-05-11)
 - QR code render trên trang `/cam-on` (đã chốt redirect gateway)
 
 ## 14. Tham chiếu
@@ -233,15 +227,17 @@ Khi env Vercel set xong + IPN URL VNPAY cấu hình:
 
 ## 15. Resume cheatsheet (cho session mới)
 
-Khi bạn mở session mới, dán vào chat:
+**Email — đã xong, không cần resume.**
 
-> Đọc `E:\decoco-web\SESSION_HANDOFF.md` rồi tiếp tục từ section "Đang chờ user (resume point)". Tôi đã chạy `vercel login` và `vercel link`. Đây là credentials:
+**Nếu mở session để làm tiếp VNPAY:**
+
+> Đọc `E:\decoco-web\SESSION_HANDOFF.md` rồi tiếp section 8a (VNPAY env). Vercel CLI đã login `decoco.accessories@gmail.com` và link đúng project `gift-web-decoco`. Credentials:
 >
 > - VNPAY_TMN_CODE: `<paste>`
 > - VNPAY_HASH_SECRET: `<paste>`
-> - RESEND_API_KEY: `<paste>`
-> - URL production: `<paste>`
 >
-> Set env Vercel rồi test giúp tôi.
+> Set env + redeploy + hướng dẫn cấu hình Return/IPN URL trên VNPAY portal.
 
-Claude sẽ đọc file này, hiểu toàn bộ context và tiếp tục đúng chỗ.
+**Nếu mở session để smoke test variant:**
+
+> Đọc `E:\decoco-web\SESSION_HANDOFF.md` section 8b. Hướng dẫn tạo product 2 variants trên prod admin và verify stock decrement đúng variant.
