@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPrice } from "@/lib/utils";
-import { Download, Eye, Search, RefreshCw } from "lucide-react";
+import { Download, Eye, Search, RefreshCw, Trash2 } from "lucide-react";
 import type { Order } from "@/lib/supabase/types";
 import OrderDetailDialog from "./OrderDetailDialog";
+import OrderDeleteDialog from "./OrderDeleteDialog";
 
 const STATUS_LABELS: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   new: { label: "Mới", variant: "default" },
@@ -70,6 +71,7 @@ export default function AdminOrdersPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<OrderRow | null>(null);
   const [searchInput, setSearchInput] = useState("");
 
   const fetchOrders = useCallback(async () => {
@@ -105,6 +107,19 @@ export default function AdminOrdersPage() {
       toast.success("Đã cập nhật trạng thái đơn hàng");
     } else {
       toast.error("Lỗi khi cập nhật trạng thái");
+    }
+  }
+
+  async function deleteOrder(id: string) {
+    const res = await fetch(`/api/orders/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+      setTotal((t) => Math.max(0, t - 1));
+      setOrderToDelete(null);
+      toast.success("Đã xoá đơn hàng");
+    } else {
+      const body = await res.json().catch(() => null);
+      toast.error(body?.error ?? "Không xoá được đơn hàng");
     }
   }
 
@@ -251,14 +266,25 @@ export default function AdminOrdersPage() {
                         </select>
                       </td>
                       <td className="px-4 py-3">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setSelectedOrder(order)}
-                          title="Xem chi tiết"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setSelectedOrder(order)}
+                            title="Xem chi tiết"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setOrderToDelete(order)}
+                            title="Xoá đơn"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -301,6 +327,16 @@ export default function AdminOrdersPage() {
         <OrderDetailDialog
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
+        />
+      )}
+
+      {/* Delete confirmation dialog */}
+      {orderToDelete && (
+        <OrderDeleteDialog
+          orderNumber={orderToDelete.order_number}
+          customerName={orderToDelete.customer_name}
+          onConfirm={() => deleteOrder(orderToDelete.id)}
+          onClose={() => setOrderToDelete(null)}
         />
       )}
     </div>
