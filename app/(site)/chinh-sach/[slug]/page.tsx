@@ -15,6 +15,10 @@ const POLICY_MAP: Record<string, { key: string; title: string }> = {
     key: "policy_return",
     title: "Chính sách đổi trả",
   },
+  "thanh-toan": {
+    key: "policy_payment",
+    title: "Phương thức thanh toán",
+  },
 };
 
 interface PageProps {

@@ -150,6 +150,9 @@ export default async function Footer() {
             <Link href="/chinh-sach/doi-tra" className="hover:text-background/60 transition-colors">
               Đổi trả
             </Link>
+            <Link href="/chinh-sach/thanh-toan" className="hover:text-background/60 transition-colors">
+              Thanh toán
+            </Link>
           </div>
         </div>
       </div>
