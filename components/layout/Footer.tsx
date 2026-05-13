@@ -9,6 +9,7 @@ const defaultContent: Record<string, string> = {
   footer_facebook: "",
   footer_tiktok: "",
   footer_instagram: "",
+  footer_bct_link: "https://online.gov.vn",
 };
 
 async function getSiteContent() {
@@ -134,6 +135,22 @@ export default async function Footer() {
                 <li>{content.footer_address}</li>
               )}
             </ul>
+            {content.footer_bct_link && (
+              <div className="pt-6">
+                <a
+                  href={content.footer_bct_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block"
+                >
+                  <img
+                    src="https://file.hstatic.net/1000187248/file/logo_da_thong_bao_bo_cong_thuong_300x300.png"
+                    alt="Đã thông báo Bộ Công Thương"
+                    className="h-12 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity"
+                  />
+                </a>
+              </div>
+            )}
           </div>
         </div>
 

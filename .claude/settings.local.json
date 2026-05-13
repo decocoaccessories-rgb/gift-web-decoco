@@ -14,7 +14,16 @@
       "WebFetch(domain:github.com)",
       "Bash(npm run *)",
       "Bash(git check-ignore *)",
-      "Bash(vercel --version)"
+      "Bash(vercel --version)",
+      "Bash(npx tsc *)",
+      "Bash(node scripts/test-design-export-fix.mjs)",
+      "Bash(node --eval ' *)",
+      "Bash(curl -s -o /tmp/_probe.txt -w \"%{http_code}\" \"https://gift-web-decoco.vercel.app/api/design/export\" -X POST)",
+      "Bash(nslookup trangsucdecoco.vn 8.8.8.8)",
+      "Bash(nslookup -type=A trangsucdecoco.vn 8.8.8.8)",
+      "Bash(nslookup -type=CNAME www.trangsucdecoco.vn 8.8.8.8)",
+      "Bash(curl -s -X POST https://api.resend.com/emails -H 'Authorization: Bearer re_drexHHjc_KEUZZZwrPa2J2AipQDeEQgyu' -H 'Content-Type: application/json' -d '{ *)",
+      "Bash(curl -s -X POST https://api.resend.com/domains -H 'Authorization: Bearer re_drexHHjc_KEUZZZwrPa2J2AipQDeEQgyu' -H 'Content-Type: application/json' -d '{\"name\":\"trangsucdecoco.vn\",\"region\":\"ap-northeast-1\"}')"
     ]
   }
 }

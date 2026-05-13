@@ -13,7 +13,7 @@ const SECTION_LABELS: Record<string, string> = {
   hero: "Hero (Banner chính)",
   story: "Giới thiệu (Story)",
   cta: "CTA",
-  footer: "Footer",
+  footer: "Chân trang (Footer)",
   policy: "Chính sách & Điều khoản",
 };
 
