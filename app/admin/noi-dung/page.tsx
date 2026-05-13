@@ -359,6 +359,19 @@ export default function AdminNoiDungPage() {
                     onChange={(e) => setDrafts((d) => ({ ...d, [item.key]: e.target.value }))}
                     className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 resize-y"
                   />
+                ) : item.key.endsWith("_visible") ? (
+                  <div className="flex items-center gap-3 py-2">
+                    <input
+                      type="checkbox"
+                      id={item.key}
+                      checked={drafts[item.key] === "true"}
+                      onChange={(e) => setDrafts((d) => ({ ...d, [item.key]: e.target.checked ? "true" : "false" }))}
+                      className="h-4 w-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      {drafts[item.key] === "true" ? "Đang hiển thị" : "Đang ẩn"}
+                    </span>
+                  </div>
                 ) : (
                   <Input
                     id={item.key}

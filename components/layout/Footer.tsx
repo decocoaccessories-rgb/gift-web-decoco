@@ -10,6 +10,7 @@ const defaultContent: Record<string, string> = {
   footer_tiktok: "",
   footer_instagram: "",
   footer_bct_link: "https://online.gov.vn",
+  footer_bct_visible: "true",
 };
 
 async function getSiteContent() {
@@ -135,7 +136,7 @@ export default async function Footer() {
                 <li>{content.footer_address}</li>
               )}
             </ul>
-            {content.footer_bct_link && (
+            {content.footer_bct_visible === "true" && content.footer_bct_link && (
               <div className="pt-4">
                 <a
                   href={content.footer_bct_link}
