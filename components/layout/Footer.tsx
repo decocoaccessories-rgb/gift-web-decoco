@@ -144,7 +144,7 @@ export default async function Footer() {
                   className="inline-block"
                 >
                   <img
-                    src="https://file.hstatic.net/1000187248/file/logo_da_thong_bao_bo_cong_thuong_300x300.png"
+                    src="/logo-bct.png"
                     alt="Đã thông báo Bộ Công Thương"
                     className="h-12 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity"
                   />
