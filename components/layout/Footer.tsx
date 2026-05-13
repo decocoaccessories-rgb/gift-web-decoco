@@ -136,7 +136,7 @@ export default async function Footer() {
               )}
             </ul>
             {content.footer_bct_link && (
-              <div className="pt-6">
+              <div className="pt-4">
                 <a
                   href={content.footer_bct_link}
                   target="_blank"
@@ -146,7 +146,7 @@ export default async function Footer() {
                   <img
                     src="/logo-bct.png"
                     alt="Đã thông báo Bộ Công Thương"
-                    className="h-12 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity"
+                    className="h-16 w-auto object-contain"
                   />
                 </a>
               </div>
