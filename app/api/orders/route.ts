@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { generateOrderNumber } from "@/lib/utils";
 import { buildVnpayPaymentUrl } from "@/lib/vnpay";
-import { sendNewOrderEmail } from "@/lib/email";
+import { sendNewOrderEmail, sendCustomerOrderEmail } from "@/lib/email";
 import type { Order, Product, ProductVariant } from "@/lib/supabase/types";
 
 // Simple in-memory rate limiter: 5 POST requests per IP per minute
@@ -134,6 +134,15 @@ export async function POST(request: NextRequest) {
     order: order as unknown as Order,
     product: { name: product.name },
   });
+
+  // Fire-and-await customer email notification (placed status) (fail-soft).
+  if (order.customer_email) {
+    await sendCustomerOrderEmail({
+      order: order as unknown as Order,
+      productName: product.name,
+      type: "placed",
+    });
+  }
 
   if (isVnpay) {
     let paymentUrl: string;
