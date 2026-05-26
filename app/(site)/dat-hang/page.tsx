@@ -326,7 +326,7 @@ export default function CheckoutPage() {
                 >
                   các chính sách
                 </Link>{" "}
-                trên website của chúng tôi.
+                trên website của DECOCO.
               </label>
             </div>
           </form>
