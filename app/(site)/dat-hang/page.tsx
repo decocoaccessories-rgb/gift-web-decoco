@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay">("cod");
+  const [policyAgreed, setPolicyAgreed] = useState(false);
 
   const {
     register,
@@ -295,7 +297,7 @@ export default function CheckoutPage() {
               type="submit"
               size="lg"
               className="w-full"
-              disabled={submitting}
+              disabled={submitting || !policyAgreed}
             >
               {submitting
                 ? "Đang xử lý..."
@@ -304,13 +306,29 @@ export default function CheckoutPage() {
                 : "Đặt hàng — Thanh toán khi nhận hàng"}
             </Button>
 
-            <p className="text-xs text-muted-foreground text-center">
-              Bằng cách đặt hàng, bạn đồng ý với{" "}
-              <span className="underline cursor-pointer">
-                điều khoản sử dụng
-              </span>{" "}
-              của chúng tôi.
-            </p>
+            <div className="flex items-start gap-2.5 justify-center py-2">
+              <input
+                type="checkbox"
+                id="policy-agree-checkbox"
+                checked={policyAgreed}
+                onChange={(e) => setPolicyAgreed(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer accent-primary"
+              />
+              <label
+                htmlFor="policy-agree-checkbox"
+                className="text-xs text-muted-foreground select-none cursor-pointer leading-normal"
+              >
+                Tôi đã đọc và đồng ý với{" "}
+                <Link
+                  href="/chinh-sach"
+                  target="_blank"
+                  className="underline hover:text-primary transition-colors font-medium"
+                >
+                  các chính sách
+                </Link>{" "}
+                trên website của chúng tôi.
+              </label>
+            </div>
           </form>
         </div>
 
