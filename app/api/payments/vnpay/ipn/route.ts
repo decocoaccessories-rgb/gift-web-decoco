@@ -102,8 +102,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(responsePayload);
   }
 
-  // VNPAY sends amount * 100; verify against stored price.
-  const expectedAmount = order.price_at_order * 100;
+  // Note: The vnpay library automatically divides the received vnp_Amount by 100 to return the original amount.
+  // We compare the received amount directly against our stored price_at_order.
+  const expectedAmount = order.price_at_order;
   const receivedAmount = Number(result.vnp_Amount);
   if (!Number.isFinite(receivedAmount) || receivedAmount !== expectedAmount) {
     responsePayload = IpnInvalidAmount;
