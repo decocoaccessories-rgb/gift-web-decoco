@@ -153,6 +153,22 @@ export async function POST(request: NextRequest) {
         ipAddr: ip === "unknown" ? "127.0.0.1" : ip,
         orderInfo: `Thanh toan don hang ${orderNumber}`,
       });
+
+      // GHI LOG CHIỀU KHỞI TẠO (INITIATE) VÀO DATABASE
+      await supabase.from("vnpay_logs").insert({
+        txn_ref: txnRef!,
+        event_type: "initiate",
+        ip_address: ip === "unknown" ? "127.0.0.1" : ip,
+        payload: {
+          amount: product.price,
+          orderInfo: `Thanh toan don hang ${orderNumber}`,
+        },
+        response: {
+          paymentUrl,
+          orderId: order.id,
+          orderNumber: order.order_number
+        }
+      });
     } catch (err) {
       console.error("VNPAY build URL failed:", err);
       await supabase.from("orders").delete().eq("id", order.id);

@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.local.example
 
+# internal planning docs (may contain secrets — keep out of git)
+/IMPLEMENTATION_PLAN_VNPAY.md
+/TEST_PLAN.md
+
 # vercel
 .vercel
 

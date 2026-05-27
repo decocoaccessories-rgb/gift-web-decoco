@@ -12,27 +12,78 @@ import {
 } from "@/lib/vnpay";
 import type { Product, ProductVariant } from "@/lib/supabase/types";
 
+// Danh sách IP chính thức của VNPAY call IPN
+const VNPAY_WHITELIST_IPS = [
+  // Môi trường Sandbox
+  "113.160.92.202",
+  "203.205.17.226",
+  "103.220.84.4",
+  // Môi trường Production
+  "113.52.45.78",
+  "116.97.245.130",
+  "42.118.107.252",
+  "113.20.97.250",
+  "203.171.19.146",
+  "103.220.87.4",
+  "103.220.86.4",
+  "103.220.86.10",
+  "103.220.87.10",
+  "103.220.86.139",
+  "103.220.87.139"
+];
+
 export async function GET(request: NextRequest) {
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   const params = Object.fromEntries(request.nextUrl.searchParams.entries());
+  
+  const supabase = createAdminClient();
+  const txnRef = params.vnp_TxnRef as string | undefined;
+
+  // Cảnh báo nếu IP gọi webhook không nằm trong whitelist của VNPAY
+  const isWhitelisted = VNPAY_WHITELIST_IPS.includes(ip);
+  if (!isWhitelisted && ip !== "unknown" && ip !== "127.0.0.1") {
+    console.warn(`[VNPAY IPN Warning] IPN called from non-whitelisted IP: ${ip}`);
+  }
 
   let result;
+  let responsePayload = IpnUnknownError;
+
+  // Hàm helper ghi log nhanh
+  async function logIpnEvent(ref: string, clientIp: string, reqPayload: any, respPayload: any) {
+    try {
+      await supabase.from("vnpay_logs").insert({
+        txn_ref: ref || "unknown",
+        event_type: "ipn_received",
+        ip_address: clientIp,
+        payload: { ...reqPayload, is_ip_whitelisted: isWhitelisted },
+        response: respPayload
+      });
+    } catch (logErr) {
+      console.error("Failed to write VNPAY IPN log to database:", logErr);
+    }
+  }
+
   try {
     result = verifyVnpayIpn(params as unknown as ReturnQueryFromVNPay);
   } catch (err) {
     console.error("VNPAY IPN verify error:", err);
-    return NextResponse.json(IpnUnknownError);
+    responsePayload = IpnUnknownError;
+    await logIpnEvent(txnRef || "unknown", ip, params, responsePayload);
+    return NextResponse.json(responsePayload);
   }
 
   if (!result.isVerified) {
-    return NextResponse.json(IpnFailChecksum);
+    responsePayload = IpnFailChecksum;
+    await logIpnEvent(txnRef || "unknown", ip, params, responsePayload);
+    return NextResponse.json(responsePayload);
   }
 
-  const txnRef = result.vnp_TxnRef as string | undefined;
   if (!txnRef) {
-    return NextResponse.json(IpnOrderNotFound);
+    responsePayload = IpnOrderNotFound;
+    await logIpnEvent("unknown", ip, params, responsePayload);
+    return NextResponse.json(responsePayload);
   }
 
-  const supabase = createAdminClient();
   const { data: order } = await supabase
     .from("orders")
     .select("id, product_id, price_at_order, payment_status, variant_name")
@@ -40,18 +91,24 @@ export async function GET(request: NextRequest) {
     .single();
 
   if (!order) {
-    return NextResponse.json(IpnOrderNotFound);
+    responsePayload = IpnOrderNotFound;
+    await logIpnEvent(txnRef, ip, params, responsePayload);
+    return NextResponse.json(responsePayload);
   }
 
   if (order.payment_status === "paid") {
-    return NextResponse.json(InpOrderAlreadyConfirmed);
+    responsePayload = InpOrderAlreadyConfirmed;
+    await logIpnEvent(txnRef, ip, params, responsePayload);
+    return NextResponse.json(responsePayload);
   }
 
   // VNPAY sends amount * 100; verify against stored price.
   const expectedAmount = order.price_at_order * 100;
   const receivedAmount = Number(result.vnp_Amount);
   if (!Number.isFinite(receivedAmount) || receivedAmount !== expectedAmount) {
-    return NextResponse.json(IpnInvalidAmount);
+    responsePayload = IpnInvalidAmount;
+    await logIpnEvent(txnRef, ip, params, responsePayload);
+    return NextResponse.json(responsePayload);
   }
 
   if (!result.isSuccess) {
@@ -65,9 +122,13 @@ export async function GET(request: NextRequest) {
         updated_at: new Date().toISOString(),
       })
       .eq("id", order.id);
-    return NextResponse.json(IpnSuccess);
+
+    responsePayload = IpnSuccess;
+    await logIpnEvent(txnRef, ip, params, responsePayload);
+    return NextResponse.json(responsePayload);
   }
 
+  // Cập nhật trạng thái ĐÃ THANH TOÁN
   await supabase
     .from("orders")
     .update({
@@ -80,7 +141,7 @@ export async function GET(request: NextRequest) {
     })
     .eq("id", order.id);
 
-  // Decrement stock now that payment is confirmed.
+  // Trừ tồn kho khi đã thanh toán thành công
   if (order.product_id) {
     const { data: rawProduct } = await supabase
       .from("products")
@@ -106,10 +167,7 @@ export async function GET(request: NextRequest) {
           }
         );
         if (rpcError) {
-          console.error(
-            "VNPAY IPN: variant stock decrement failed:",
-            rpcError
-          );
+          console.error("VNPAY IPN: variant stock decrement failed:", rpcError);
         }
       } else {
         await supabase
@@ -120,5 +178,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json(IpnSuccess);
+  responsePayload = IpnSuccess;
+  await logIpnEvent(txnRef, ip, params, responsePayload);
+  return NextResponse.json(responsePayload);
 }
