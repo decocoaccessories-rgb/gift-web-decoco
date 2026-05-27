@@ -37,6 +37,7 @@ yarn-error.log*
 # internal planning docs (may contain secrets — keep out of git)
 /IMPLEMENTATION_PLAN_VNPAY.md
 /TEST_PLAN.md
+/BUG_REPORT.md
 
 # vercel
 .vercel
