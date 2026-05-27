@@ -96,18 +96,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(responsePayload);
   }
 
-  if (order.payment_status === "paid") {
-    responsePayload = InpOrderAlreadyConfirmed;
-    await logIpnEvent(txnRef, ip, params, responsePayload);
-    return NextResponse.json(responsePayload);
-  }
-
+  // Kiểm tra số tiền có khớp không (ưu tiên trước khi kiểm tra trạng thái đã xử lý
+  // để tuân thủ thứ tự kiểm tra IPN chuẩn của VNPAY: 97 -> 01 -> 04 -> 02 -> 00).
   // Note: The vnpay library automatically divides the received vnp_Amount by 100 to return the original amount.
   // We compare the received amount directly against our stored price_at_order.
   const expectedAmount = order.price_at_order;
   const receivedAmount = Number(result.vnp_Amount);
   if (!Number.isFinite(receivedAmount) || receivedAmount !== expectedAmount) {
     responsePayload = IpnInvalidAmount;
+    await logIpnEvent(txnRef, ip, params, responsePayload);
+    return NextResponse.json(responsePayload);
+  }
+
+  // Kiểm tra giao dịch đã được cập nhật trạng thái trước đó hay chưa (khác pending).
+  if (order.payment_status !== "pending") {
+    responsePayload = InpOrderAlreadyConfirmed;
     await logIpnEvent(txnRef, ip, params, responsePayload);
     return NextResponse.json(responsePayload);
   }
