@@ -7,7 +7,7 @@ export type Json =
   | Json[];
 
 export type OrderStatus = "new" | "confirmed" | "shipping" | "done" | "cancelled";
-export type PaymentMethod = "cod" | "vnpay";
+export type PaymentMethod = "cod" | "vnpay" | "vietqr";
 export type PaymentStatus = "pending" | "paid" | "failed" | "cancelled";
 export type SiteContentType = "text" | "image" | "richtext" | "url";
 export type PhotoSlotShape = "rect" | "circle" | "rounded-rect";
@@ -91,6 +91,9 @@ export interface Database {
           payment_status: PaymentStatus;
           vnp_txn_ref: string | null;
           vnp_transaction_no: string | null;
+          vietqr_content: string | null;
+          vietqr_qr_url: string | null;
+          vietqr_expires_at: string | null;
           paid_at: string | null;
           created_at: string;
           updated_at: string;

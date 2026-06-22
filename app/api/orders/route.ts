@@ -3,6 +3,12 @@ import { z } from "zod";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { generateOrderNumber } from "@/lib/utils";
 import { buildVnpayPaymentUrl } from "@/lib/vnpay";
+import {
+  isVietqrConfigured,
+  normalizeOrderRef,
+  buildVietqrImageUrl,
+  vietqrExpiresAt,
+} from "@/lib/vietqr";
 import { sendNewOrderEmail, sendCustomerOrderEmail } from "@/lib/email";
 import type { Order, Product, ProductVariant } from "@/lib/supabase/types";
 
@@ -26,7 +32,7 @@ const orderSchema = z.object({
   design_image_url: z.string().url().optional(),
   design_data: z.record(z.string(), z.unknown()).optional(),
   variant_name: z.string().max(100).nullable().optional(),
-  payment_method: z.enum(["cod", "vnpay"]).default("cod"),
+  payment_method: z.enum(["cod", "vnpay", "vietqr"]).default("cod"),
   customer_name: z.string().min(2).max(100),
   customer_phone: z
     .string()
@@ -98,7 +104,45 @@ export async function POST(request: NextRequest) {
 
   const orderNumber = generateOrderNumber();
   const isVnpay = data.payment_method === "vnpay";
-  const txnRef = isVnpay ? `${orderNumber}-${Date.now().toString(36)}` : null;
+  const isVietqr = data.payment_method === "vietqr";
+  const txnRef = isVnpay
+    ? `${orderNumber}_${Date.now().toString(36)}`.replace(/-/g, "_")
+    : null;
+
+  // VietQR: cấu hình env phải sẵn sàng trước khi nhận đơn (giống VNPAY fail nếu thiếu).
+  if (isVietqr && !isVietqrConfigured()) {
+    return NextResponse.json(
+      { error: "Cổng VietQR chưa cấu hình. Vui lòng chọn COD hoặc VNPAY." },
+      { status: 503 }
+    );
+  }
+
+  // VietQR: nội dung chuyển khoản + QR + hạn (đơn vẫn 'pending', không trừ kho lúc tạo).
+  const vietqrContent = isVietqr ? normalizeOrderRef(orderNumber) : null;
+  const vietqrExpiresAtIso = isVietqr ? vietqrExpiresAt().toISOString() : null;
+  let vietqrQrUrl: string | null = null;
+  if (isVietqr) {
+    try {
+      vietqrQrUrl = buildVietqrImageUrl({ amount: product.price, content: vietqrContent! });
+    } catch (err) {
+      console.error("VietQR build QR url failed:", err);
+      return NextResponse.json(
+        { error: "Cổng VietQR chưa cấu hình. Vui lòng chọn COD hoặc VNPAY." },
+        { status: 503 }
+      );
+    }
+  }
+
+  // Chỉ đính kèm các cột vietqr_* khi đơn thực sự là VietQR. Nhờ vậy luồng
+  // COD/VNPAY không tham chiếu cột mới — code deploy được an toàn kể cả khi
+  // migration 008 chưa được áp dụng (tính năng VietQR vẫn đang gate off).
+  const vietqrColumns = isVietqr
+    ? {
+        vietqr_content: vietqrContent,
+        vietqr_qr_url: vietqrQrUrl,
+        vietqr_expires_at: vietqrExpiresAtIso,
+      }
+    : {};
 
   const { data: order, error: insertError } = await supabase
     .from("orders")
@@ -120,6 +164,7 @@ export async function POST(request: NextRequest) {
       payment_method: data.payment_method,
       payment_status: "pending",
       vnp_txn_ref: txnRef,
+      ...vietqrColumns,
     })
     .select("id, order_number, customer_name, customer_phone, customer_email, province, address, note, price_at_order, variant_name, design_image_url, payment_method, payment_status, created_at")
     .single();
@@ -180,6 +225,23 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       { orderId: order.id, orderNumber: order.order_number, paymentUrl },
+      { status: 201 }
+    );
+  }
+
+  if (isVietqr) {
+    // Không trừ kho lúc tạo đơn — trừ khi webhook SePay xác nhận 'paid'.
+    return NextResponse.json(
+      {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        vietqr: {
+          qrUrl: vietqrQrUrl,
+          amount: order.price_at_order,
+          content: vietqrContent,
+          expiresAt: vietqrExpiresAtIso,
+        },
+      },
       { status: 201 }
     );
   }

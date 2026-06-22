@@ -29,6 +29,7 @@ type OrderRow = Pick<
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   cod: "COD — Thanh toán khi nhận",
   vnpay: "VNPAY",
+  vietqr: "Chuyển khoản VietQR",
 };
 
 const PAYMENT_STATUS_LABEL: Record<string, string> = {

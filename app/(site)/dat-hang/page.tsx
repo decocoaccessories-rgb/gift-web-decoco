@@ -45,8 +45,9 @@ export default function CheckoutPage() {
   const [designInfo, setDesignInfo] = useState<DesignInfo | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "vietqr">("cod");
   const [policyAgreed, setPolicyAgreed] = useState(false);
+  const vietqrEnabled = process.env.NEXT_PUBLIC_VIETQR_ENABLED === "true";
 
   const {
     register,
@@ -106,6 +107,11 @@ export default function CheckoutPage() {
 
       if (data.paymentUrl) {
         window.location.href = data.paymentUrl as string;
+        return;
+      }
+
+      if (data.vietqr) {
+        router.push(`/thanh-toan/${data.orderId}`);
         return;
       }
 
@@ -284,6 +290,24 @@ export default function CheckoutPage() {
                     </p>
                   </div>
                 </label>
+                {vietqrEnabled && (
+                  <label className="flex items-start gap-3 rounded-lg border border-input p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
+                    <input
+                      type="radio"
+                      name="payment_method"
+                      value="vietqr"
+                      checked={paymentMethod === "vietqr"}
+                      onChange={() => setPaymentMethod("vietqr")}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Chuyển khoản VietQR</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Quét mã QR, đơn tự xác nhận sau khi chuyển khoản.
+                      </p>
+                    </div>
+                  </label>
+                )}
               </div>
             </div>
 
@@ -303,6 +327,8 @@ export default function CheckoutPage() {
                 ? "Đang xử lý..."
                 : paymentMethod === "vnpay"
                 ? "Đặt hàng — Thanh toán VNPAY"
+                : paymentMethod === "vietqr"
+                ? "Đặt hàng — Chuyển khoản VietQR"
                 : "Đặt hàng — Thanh toán khi nhận hàng"}
             </Button>
 
@@ -377,6 +403,8 @@ export default function CheckoutPage() {
                 <p className="text-xs text-muted-foreground bg-secondary/40 rounded-md px-3 py-2">
                   {paymentMethod === "vnpay"
                     ? "Thanh toán qua VNPAY (QR / ATM / Visa)"
+                    : paymentMethod === "vietqr"
+                    ? "Chuyển khoản VietQR — tự xác nhận"
                     : "Thanh toán khi nhận hàng (COD)"}
                 </p>
               </>

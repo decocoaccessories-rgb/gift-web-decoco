@@ -28,6 +28,7 @@ export interface CustomerOrderEmailData {
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   cod: "COD — Thanh toán khi nhận hàng",
   vnpay: "Thanh toán điện tử VNPAY",
+  vietqr: "Chuyển khoản VietQR",
 };
 
 const PAYMENT_STATUS_LABEL: Record<string, string> = {

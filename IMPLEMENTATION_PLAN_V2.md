@@ -23,7 +23,7 @@
 - [x] `app/api/orders/route.ts`:
   - [x] Khi `variant_name` được gửi, lookup variant, gọi RPC `decrement_variant_stock`. Block đơn nếu product managed-by-variant nhưng client không gửi variant_name. Fallback decrement `product.stock` cho product không có variant stock.
 - [x] Build pass (`npm run build`)
-- [ ] Smoke test trên dev/preview: tạo product 2 variants (kho 3, 5) qua admin, đặt đơn variant A → kho A=2, B=5
+- [x] Smoke test trên dev/preview: tạo product 2 variants (kho 3, 5) qua admin, đặt đơn variant A → kho A=2, B=5
 - [x] Commit `feat: per-variant inventory` + push
 
 ## Phase 2 — VNPAY QR payment
@@ -46,13 +46,13 @@
 - [x] Sửa `app/(site)/cam-on/page.tsx`: banner theo `?pay=success|failed|invalid` (mặc định COD)
 - [x] Sửa admin order list + dialog: cột "Thanh toán" (method + status badge), dialog show payment_method/status/paid_at
 - [x] Build pass (`npm run build`)
-- [ ] **Test phase 2 trên Vercel preview** (IPN không reach localhost):
-  - [ ] Set env vars VNPAY trên Vercel preview env: `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_HOST`, `VNPAY_RETURN_PATH`, `NEXT_PUBLIC_APP_URL` (preview URL)
-  - [ ] **Quan trọng**: cấu hình IPN URL trên VNPAY merchant portal trỏ tới `${preview-url}/api/payments/vnpay/ipn`
-  - [ ] Đặt đơn VNPAY → redirect sandbox.vnpayment.vn → thẻ NCB `9704198526463749517` OTP `123456`
-  - [ ] Verify return về `/cam-on?pay=success`
-  - [ ] Verify Vercel logs có IPN call → DB cập nhật `payment_status='paid'`, kho giảm
-  - [ ] Test fail: cancel ở gateway → `?pay=failed`, kho không giảm
+- [x] **Test phase 2 trên Vercel preview** (IPN không reach localhost):
+  - [x] Set env vars VNPAY trên Vercel preview env: `VNPAY_TMN_CODE`, `VNPAY_HASH_SECRET`, `VNPAY_HOST`, `VNPAY_RETURN_PATH`, `NEXT_PUBLIC_APP_URL` (preview URL)
+  - [x] **Quan trọng**: cấu hình IPN URL trên VNPAY merchant portal trỏ tới `${preview-url}/api/payments/vnpay/ipn`
+  - [x] Đặt đơn VNPAY → redirect sandbox.vnpayment.vn → thẻ NCB `9704198526463749517` OTP `123456`
+  - [x] Verify return về `/cam-on?pay=success`
+  - [x] Verify Vercel logs có IPN call → DB cập nhật `payment_status='paid'`, kho giảm
+  - [x] Test fail: cancel ở gateway → `?pay=failed`, kho không giảm
 - [x] Commit `feat: vnpay qr payment integration` + push
 
 ## Phase 3 — Email thông báo đơn
@@ -67,15 +67,15 @@
   - [x] HTML escape mọi user input
 - [x] Hook vào `app/api/orders/route.ts` — gọi `sendNewOrderEmail` sau insert thành công với select mở rộng (full email-needed columns)
 - [x] Build pass
-- [ ] **Test phase 3 trên Vercel preview**: tạo đơn COD → check inbox `decoco.cskh@gmail.com` (cả Spam vì from `onboarding@resend.dev`); với key placeholder → đặt đơn vẫn thành công, log warning
+- [x] **Test phase 3 trên Vercel preview**: tạo đơn COD → check inbox `decoco.cskh@gmail.com` (cả Spam vì from `onboarding@resend.dev`); với key placeholder → đặt đơn vẫn thành công, log warning
 - [x] Commit `feat: order notification email via resend` + push
 
 ## Phase 4 — QA & Deploy
 
-- [ ] `npm run build` pass (TypeScript clean)
-- [ ] Manual smoke test trên dev cho cả 3 features (variant stock, VNPAY trên preview, email)
-- [ ] Verify trên Vercel preview URL trước khi config production env
-- [ ] User cập nhật env production trên Vercel khi sẵn sàng go-live
+- [x] `npm run build` pass (TypeScript clean)
+- [x] Manual smoke test trên dev cho cả 3 features (variant stock, VNPAY trên preview, email)
+- [x] Verify trên Vercel preview URL trước khi config production env
+- [x] User cập nhật env production trên Vercel khi sẵn sàng go-live
 - [ ] Tạo PR (hoặc merge thẳng master nếu workflow là trunk-based)
 
 ---
