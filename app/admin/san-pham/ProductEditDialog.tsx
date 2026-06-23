@@ -20,7 +20,7 @@ interface Props {
   onSaved: (product: ProductRow) => void;
 }
 
-const MAX_IMAGES = 10;
+const MAX_IMAGES = 20;
 
 export default function ProductEditDialog({ product, onClose, onSaved }: Props) {
   const isNew = !product;

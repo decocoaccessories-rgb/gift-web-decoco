@@ -18,7 +18,7 @@ const patchSchema = z.object({
   price: z.number().int().positive().optional(),
   stock: z.number().int().min(0).optional(),
   is_visible: z.boolean().optional(),
-  images: z.array(z.string()).max(10).optional(),
+  images: z.array(z.string()).max(20).optional(),
   sort_order: z.number().int().optional(),
 });
 

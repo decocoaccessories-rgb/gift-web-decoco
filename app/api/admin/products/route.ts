@@ -18,7 +18,7 @@ const createSchema = z.object({
   price: z.number().int().positive(),
   stock: z.number().int().min(0),
   is_visible: z.boolean().default(true),
-  images: z.array(z.string().url()).max(10).default([]),
+  images: z.array(z.string().url()).max(20).default([]),
   sort_order: z.number().int().default(0),
 });
 
