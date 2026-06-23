@@ -45,9 +45,8 @@ export default function CheckoutPage() {
   const [designInfo, setDesignInfo] = useState<DesignInfo | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "vietqr">("cod");
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "vietqr">("vietqr");
   const [policyAgreed, setPolicyAgreed] = useState(false);
-  const vietqrEnabled = process.env.NEXT_PUBLIC_VIETQR_ENABLED === "true";
 
   const {
     register,
@@ -200,7 +199,7 @@ export default function CheckoutPage() {
               <select
                 id="province"
                 {...register("province")}
-                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+                className="flex h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
                 aria-invalid={!!errors.province}
                 defaultValue=""
               >
@@ -262,52 +261,18 @@ export default function CheckoutPage() {
                   <input
                     type="radio"
                     name="payment_method"
-                    value="cod"
-                    checked={paymentMethod === "cod"}
-                    onChange={() => setPaymentMethod("cod")}
+                    value="vietqr"
+                    checked={paymentMethod === "vietqr"}
+                    onChange={() => setPaymentMethod("vietqr")}
                     className="mt-0.5"
                   />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">Thanh toán khi nhận hàng (COD)</p>
+                    <p className="text-sm font-medium">Chuyển khoản VietQR</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Nhân viên sẽ xác nhận đơn trước khi giao.
+                      Quét mã QR, đơn tự xác nhận sau khi chuyển khoản.
                     </p>
                   </div>
                 </label>
-                <label className="flex items-start gap-3 rounded-lg border border-input p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
-                  <input
-                    type="radio"
-                    name="payment_method"
-                    value="vnpay"
-                    checked={paymentMethod === "vnpay"}
-                    onChange={() => setPaymentMethod("vnpay")}
-                    className="mt-0.5"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">VNPAY (QR / ATM / Visa)</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Chuyển sang cổng VNPAY để thanh toán an toàn.
-                    </p>
-                  </div>
-                </label>
-                {vietqrEnabled && (
-                  <label className="flex items-start gap-3 rounded-lg border border-input p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
-                    <input
-                      type="radio"
-                      name="payment_method"
-                      value="vietqr"
-                      checked={paymentMethod === "vietqr"}
-                      onChange={() => setPaymentMethod("vietqr")}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">Chuyển khoản VietQR</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        Quét mã QR, đơn tự xác nhận sau khi chuyển khoản.
-                      </p>
-                    </div>
-                  </label>
-                )}
               </div>
             </div>
 
