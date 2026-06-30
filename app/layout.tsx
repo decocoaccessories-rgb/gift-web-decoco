@@ -24,21 +24,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://trangsucdecoco.vn"),
   title: {
-    default: "DECOCO — Hộp Quà Tặng Cá Nhân Hoá",
+    default: "DECOCO — Hộp Quà Tặng Cá Nhân Hoá Kèm Trang Sức",
     template: "%s | DECOCO",
   },
   description:
-    "Thiết kế hộp quà tặng độc đáo với ảnh của bạn. Set trang sức DECOCO kết hợp hộp in ảnh cá nhân hoá — món quà ý nghĩa nhất.",
-  keywords: ["quà tặng", "hộp quà", "cá nhân hoá", "trang sức", "DECOCO", "in ảnh"],
+    "Tự thiết kế hộp quà in ảnh của bạn kèm set trang sức tinh tế. Món quà cá nhân hoá độc bản cho sinh nhật, kỷ niệm và tặng người thương.",
+  keywords: ["quà tặng", "hộp quà", "cá nhân hoá", "trang sức", "DECOCO", "in ảnh", "quà sinh nhật", "quà kỷ niệm"],
   authors: [{ name: "DECOCO" }],
   openGraph: {
     type: "website",
     locale: "vi_VN",
     siteName: "DECOCO",
-    title: "DECOCO — Hộp Quà Tặng Cá Nhân Hoá",
+    url: "/",
+    title: "DECOCO — Hộp Quà Tặng Cá Nhân Hoá Kèm Trang Sức",
     description:
-      "Thiết kế hộp quà tặng độc đáo với ảnh của bạn. Set trang sức DECOCO kết hợp hộp in ảnh cá nhân hoá.",
+      "Tự thiết kế hộp quà in ảnh của bạn kèm set trang sức tinh tế. Món quà cá nhân hoá độc bản cho sinh nhật, kỷ niệm và tặng người thương.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "DECOCO — Hộp Quà Tặng Cá Nhân Hoá Kèm Trang Sức",
+    description:
+      "Tự thiết kế hộp quà in ảnh của bạn kèm set trang sức tinh tế. Món quà cá nhân hoá độc bản cho người thương.",
   },
   robots: {
     index: true,
