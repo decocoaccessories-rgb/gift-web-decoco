@@ -29,6 +29,12 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
   const variants: ProductVariant[] = (product.variants ?? []) as ProductVariant[];
   const hasVariants = variants.length > 0;
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [variantClickTrigger, setVariantClickTrigger] = useState(0);
+
+  const handleVariantSelect = (variantId: string) => {
+    setSelectedVariantId(variantId);
+    setVariantClickTrigger((prev) => prev + 1);
+  };
 
   const selectedVariant = useMemo(
     () => variants.find((v) => v.id === selectedVariantId) ?? null,
@@ -57,7 +63,7 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
       {/* Product info grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
         {/* Left: image slider */}
-        <ImageSlider images={images} alt={product.name} />
+        <ImageSlider images={images} alt={product.name} variantClickTrigger={variantClickTrigger} />
 
         {/* Right: info */}
         <div className="space-y-5">
@@ -105,7 +111,7 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
                     <button
                       key={v.id}
                       type="button"
-                      onClick={() => setSelectedVariantId(v.id)}
+                      onClick={() => handleVariantSelect(v.id)}
                       className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm transition-colors ${
                         active
                           ? "border-primary ring-2 ring-primary/30"

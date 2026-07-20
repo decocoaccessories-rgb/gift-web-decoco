@@ -2,7 +2,7 @@
 
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Thumbs, FreeMode } from "swiper/modules";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import type { SwiperClass } from "swiper/react";
 import "swiper/css";
@@ -13,10 +13,20 @@ import "swiper/css/free-mode";
 interface ImageSliderProps {
   images: string[];
   alt: string;
+  variantClickTrigger?: number;
 }
 
-export default function ImageSlider({ images, alt }: ImageSliderProps) {
+export default function ImageSlider({ images, alt, variantClickTrigger }: ImageSliderProps) {
   const [thumbsSwiper, setThumbsSwiper] = useState<SwiperClass | null>(null);
+  const [mainSwiper, setMainSwiper] = useState<SwiperClass | null>(null);
+
+  // Khi phân loại được chọn/đổi, mảng ảnh đưa ảnh phân loại lên đầu (index 0).
+  // Buộc slider chính trượt về index 0 để hiển thị đúng ảnh phân loại.
+  useEffect(() => {
+    if (mainSwiper && !mainSwiper.destroyed) {
+      mainSwiper.slideTo(0);
+    }
+  }, [images, variantClickTrigger, mainSwiper]);
 
   if (!images.length) {
     return (
@@ -31,6 +41,7 @@ export default function ImageSlider({ images, alt }: ImageSliderProps) {
       {/* Main slider */}
       <Swiper
         modules={[Navigation, Thumbs]}
+        onSwiper={setMainSwiper}
         thumbs={{ swiper: thumbsSwiper && !thumbsSwiper.destroyed ? thumbsSwiper : null }}
         navigation={images.length > 1}
         className="aspect-square rounded-xl overflow-hidden border border-border [--swiper-navigation-color:theme(colors.primary)]"
