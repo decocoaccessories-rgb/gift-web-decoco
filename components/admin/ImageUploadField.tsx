@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Image from "next/image";
+import FallbackImage from "@/components/ui/FallbackImage";
 import { Loader2, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -80,7 +80,7 @@ export default function ImageUploadField({
       {value && (
         <div className="relative w-full max-w-sm rounded-lg overflow-hidden border border-border bg-muted/20">
           <div className="relative aspect-video">
-            <Image src={value} alt="Preview" fill className="object-cover" sizes="400px" />
+            <FallbackImage src={value} alt="Preview" fill className="object-cover" sizes="400px" />
           </div>
           <button
             type="button"

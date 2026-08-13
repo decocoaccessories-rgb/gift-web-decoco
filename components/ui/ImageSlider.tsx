@@ -3,7 +3,7 @@
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Thumbs, FreeMode } from "swiper/modules";
 import { useEffect, useState } from "react";
-import Image from "next/image";
+import FallbackImage from "@/components/ui/FallbackImage";
 import type { SwiperClass } from "swiper/react";
 import "swiper/css";
 import "swiper/css/navigation";
@@ -49,7 +49,7 @@ export default function ImageSlider({ images, alt, variantClickTrigger }: ImageS
         {images.map((src, i) => (
           <SwiperSlide key={i}>
             <div className="relative w-full h-full">
-              <Image
+              <FallbackImage
                 src={src}
                 alt={`${alt} - ${i + 1}`}
                 fill
@@ -76,7 +76,7 @@ export default function ImageSlider({ images, alt, variantClickTrigger }: ImageS
           {images.map((src, i) => (
             <SwiperSlide key={i} className="cursor-pointer opacity-50 [&.swiper-slide-thumb-active]:opacity-100 transition-opacity">
               <div className="relative w-full h-full rounded-md overflow-hidden border border-border">
-                <Image
+                <FallbackImage
                   src={src}
                   alt={`${alt} thumbnail ${i + 1}`}
                   fill

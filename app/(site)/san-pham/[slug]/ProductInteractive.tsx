@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
+import FallbackImage from "@/components/ui/FallbackImage";
 import ImageSlider from "@/components/ui/ImageSlider";
 import DesignTool from "@/components/DesignTool/DesignTool";
 import { Badge } from "@/components/ui/badge";
@@ -119,7 +119,7 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
                       }`}
                     >
                       <span className="relative h-7 w-7 rounded-md overflow-hidden bg-secondary/20 shrink-0">
-                        <Image src={v.image_url} alt={v.name} fill sizes="28px" className="object-cover" />
+                        <FallbackImage src={v.image_url} alt={v.name} fill sizes="28px" className="object-cover" />
                       </span>
                       <span>{v.name}</span>
                     </button>

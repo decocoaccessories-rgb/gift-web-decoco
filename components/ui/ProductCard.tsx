@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
+import FallbackImage from "@/components/ui/FallbackImage";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
@@ -61,7 +61,7 @@ export default function ProductCard({ product }: ProductCardProps) {
       <div className="relative aspect-square overflow-hidden bg-secondary/30">
         {primaryImage ? (
           <>
-            <Image
+            <FallbackImage
               src={primaryImage}
               alt={product.name}
               fill
@@ -69,7 +69,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               className={`object-cover transition-opacity duration-500 group-hover:opacity-0 ${showSecond ? "opacity-0" : ""}`}
             />
             {hoverImage && (
-              <Image
+              <FallbackImage
                 src={hoverImage}
                 alt={`${product.name} - alternate`}
                 fill
