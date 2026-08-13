@@ -3,10 +3,25 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw, Plus, Trash2, X, Loader2, Save, Upload } from "lucide-react";
+import { RefreshCw, Plus, Trash2, X, Loader2, Save, Upload, GripVertical } from "lucide-react";
 import type { Frame, FrameConfig } from "@/lib/supabase/types";
 
 type FrameRow = Pick<Frame, "id" | "name" | "product_id" | "thumbnail_url" | "config" | "sort_order">;
@@ -24,6 +39,10 @@ export default function AdminFramesPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [editFrame, setEditFrame] = useState<FrameRow | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
 
   async function fetchFrames() {
     setLoading(true);
@@ -45,6 +64,37 @@ export default function AdminFramesPage() {
       toast.success("Đã xoá khung");
     } else {
       toast.error("Lỗi khi xoá khung");
+    }
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = frames.findIndex((f) => f.id === active.id);
+    const newIndex = frames.findIndex((f) => f.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const previous = frames;
+    const reordered = arrayMove(frames, oldIndex, newIndex).map((f, i) => ({
+      ...f,
+      sort_order: i,
+    }));
+    setFrames(reordered);
+
+    const res = await fetch("/api/admin/frames/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: reordered.map((f) => ({ id: f.id, sort_order: f.sort_order })),
+      }),
+    });
+
+    if (res.ok) {
+      toast.success("Đã lưu thứ tự khung mới");
+    } else {
+      setFrames(previous);
+      toast.error("Lỗi khi lưu thứ tự khung");
     }
   }
 
@@ -86,54 +136,25 @@ export default function AdminFramesPage() {
           Chưa có khung nào. Nhấn "Thêm khung" để bắt đầu.
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {frames.map((frame) => (
-            <div
-              key={frame.id}
-              className="border border-border rounded-xl overflow-hidden bg-card hover:border-primary/40 transition-colors"
-            >
-              <div className="relative aspect-square bg-secondary/20">
-                {(frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage) ? (
-                  <Image
-                    src={frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage!}
-                    alt={frame.name}
-                    fill
-                    sizes="200px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30 text-xs">
-                    No preview
-                  </div>
-                )}
-              </div>
-              <div className="p-3">
-                <p className="text-sm font-medium truncate">{frame.name}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {(frame.config as FrameConfig).photoSlots?.length ?? 0} slot ảnh
-                </p>
-                <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="flex-1 text-xs"
-                    onClick={() => setEditFrame(frame)}
-                  >
-                    Sửa
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => deleteFrame(frame.id)}
-                    className="text-destructive hover:text-destructive px-2"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={frames.map((f) => f.id)} strategy={rectSortingStrategy}>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {frames.map((frame, index) => (
+                <SortableFrameCard
+                  key={frame.id}
+                  frame={frame}
+                  index={index}
+                  onEdit={() => setEditFrame(frame)}
+                  onDelete={() => deleteFrame(frame.id)}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {(showAdd || editFrame) && (
@@ -143,6 +164,82 @@ export default function AdminFramesPage() {
           onSaved={onSaved}
         />
       )}
+    </div>
+  );
+}
+
+interface SortableFrameCardProps {
+  frame: FrameRow;
+  index: number;
+  onEdit: () => void;
+  onDelete: () => void;
+}
+
+function SortableFrameCard({ frame, index, onEdit, onDelete }: SortableFrameCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: frame.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  const previewUrl = frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="border border-border rounded-xl overflow-hidden bg-card hover:border-primary/40 transition-colors"
+    >
+      <div className="relative aspect-square bg-secondary/20">
+        {previewUrl ? (
+          <Image
+            src={previewUrl}
+            alt={frame.name}
+            fill
+            sizes="200px"
+            className="object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground/30 text-xs">
+            No preview
+          </div>
+        )}
+        <span className="absolute top-2 left-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-xs font-semibold text-white">
+          {index + 1}
+        </span>
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/60 text-white cursor-grab active:cursor-grabbing touch-none"
+          aria-label="Kéo để sắp xếp"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="p-3">
+        <p className="text-sm font-medium truncate">{frame.name}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {(frame.config as FrameConfig).photoSlots?.length ?? 0} slot ảnh
+        </p>
+        <div className="flex gap-2 mt-2">
+          <Button size="sm" variant="outline" className="flex-1 text-xs" onClick={onEdit}>
+            Sửa
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onDelete}
+            className="text-destructive hover:text-destructive px-2"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
