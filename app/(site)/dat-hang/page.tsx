@@ -273,6 +273,22 @@ export default function CheckoutPage() {
                     </p>
                   </div>
                 </label>
+                <label className="flex items-start gap-3 rounded-lg border border-input p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
+                  <input
+                    type="radio"
+                    name="payment_method"
+                    value="cod"
+                    checked={paymentMethod === "cod"}
+                    onChange={() => setPaymentMethod("cod")}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Thanh toán khi nhận hàng (COD)</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Thanh toán bằng tiền mặt khi đơn vị vận chuyển giao hàng.
+                    </p>
+                  </div>
+                </label>
               </div>
             </div>
 
