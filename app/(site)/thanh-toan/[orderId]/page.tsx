@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn, formatPrice } from "@/lib/utils";
+import { nextPollDelay } from "@/lib/vietqr-poll";
 import { Loader2, CheckCircle, Clock, Copy, Check } from "lucide-react";
 
 interface VietqrStatus {
@@ -15,8 +16,6 @@ interface VietqrStatus {
   qrUrl: string | null;
   expiresAt: string | null;
 }
-
-const POLL_MS = 4000;
 
 export default function VietqrPaymentPage({
   params,
@@ -37,7 +36,7 @@ export default function VietqrPaymentPage({
       });
       if (res.status === 404) {
         setNotFound(true);
-        return null;
+        return "notfound" as const;
       }
       if (!res.ok) return null;
       const data = (await res.json()) as VietqrStatus;
@@ -48,27 +47,56 @@ export default function VietqrPaymentPage({
     }
   }, [orderId]);
 
-  // Polling trạng thái thanh toán.
+  // Polling trạng thái thanh toán. Dừng hẳn khi đơn đã chốt / hết hạn / 404,
+  // và tạm nghỉ khi tab bị ẩn — tránh bắn request vô hạn vào PostgREST.
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
+    let stopped = false;
+    const startedAt = Date.now();
 
     async function tick() {
+      if (!active || stopped) return;
+      if (document.visibilityState === "hidden") return;
+
       const data = await fetchStatus();
       if (!active) return;
-      if (data?.paymentStatus === "paid") {
+
+      if (data && data !== "notfound" && data.paymentStatus === "paid") {
         router.push(
           `/cam-on?id=${orderId}&num=${encodeURIComponent(data.orderNumber)}&pay=success`
         );
         return;
       }
-      timer = setTimeout(tick, POLL_MS);
+
+      const delay = nextPollDelay({
+        now: Date.now(),
+        startedAt,
+        expiresAt: data && data !== "notfound" ? data.expiresAt : null,
+        paymentStatus:
+          data && data !== "notfound" ? data.paymentStatus : undefined,
+        notFound: data === "notfound",
+      });
+      if (delay === null) {
+        stopped = true;
+        return;
+      }
+      timer = setTimeout(tick, delay);
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        clearTimeout(timer);
+        tick();
+      }
     }
 
     tick();
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       active = false;
       clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [fetchStatus, orderId, router]);
 
@@ -209,10 +237,12 @@ export default function VietqrPaymentPage({
           <li>Trang sẽ tự chuyển khi nhận được thanh toán (vài giây).</li>
         </ol>
 
-        <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          Đang chờ thanh toán…
-        </div>
+        {!expired && (
+          <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Đang chờ thanh toán…
+          </div>
+        )}
       </div>
     </div>
   );
