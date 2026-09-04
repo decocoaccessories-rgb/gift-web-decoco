@@ -72,7 +72,9 @@ export default function ExitIntentOffer({ code, title, body, cta }: Props) {
     }
   }, [code, router, pathname]);
 
-  // Arm triggers once per session, after a short delay, when not suppressed.
+  // Vũ trang lại MỖI KHI đổi trang (dep có `pathname`) để bẫy Back luôn nhắm
+  // đúng trang hiện tại: entry lịch sử giả trỏ chính URL đang đứng, nên cú Back
+  // đầu tiên chỉ gỡ nó ra — URL không đổi, không điều hướng — rồi mở popup.
   useEffect(() => {
     if (suppressed) return;
     if (safeGet(window.sessionStorage, SS_SHOWN)) return;
@@ -80,39 +82,39 @@ export default function ExitIntentOffer({ code, title, body, cta }: Props) {
     const last = Number(safeGet(window.localStorage, LS_KEY) ?? 0);
     if (last && Date.now() - last < SUPPRESS_MS) return;
 
-    let armed = false;
     const finePointer =
       typeof window.matchMedia === "function" &&
       window.matchMedia("(pointer:fine)").matches;
 
+    let disarm = () => {};
+
     const trigger = () => {
-      if (armed) return;
-      armed = true;
       safeSet(window.sessionStorage, SS_SHOWN, "1");
       setOpen(true);
+      disarm();
     };
-
-    const onMouseOut = (e: MouseEvent) => {
-      if (!e.relatedTarget && e.clientY <= 0) trigger();
-    };
-    const onPopState = () => trigger();
 
     const armTimer = window.setTimeout(() => {
       if (finePointer) {
+        const onMouseOut = (e: MouseEvent) => {
+          if (!e.relatedTarget && e.clientY <= 0) trigger();
+        };
         document.addEventListener("mouseout", onMouseOut);
+        disarm = () => document.removeEventListener("mouseout", onMouseOut);
       } else {
-        // Mobile: chặn nút Back một lần để hiện ưu đãi.
+        // Mobile: chèn 1 nấc lịch sử giả = ĐÚNG URL trang hiện tại.
         history.pushState(null, "", window.location.href);
+        const onPopState = () => trigger();
         window.addEventListener("popstate", onPopState);
+        disarm = () => window.removeEventListener("popstate", onPopState);
       }
     }, ARM_DELAY_MS);
 
     return () => {
       window.clearTimeout(armTimer);
-      document.removeEventListener("mouseout", onMouseOut);
-      window.removeEventListener("popstate", onPopState);
+      disarm();
     };
-  }, [suppressed]);
+  }, [suppressed, pathname]);
 
   // Lock scroll + focus + ESC/Tab trap while open.
   useEffect(() => {

@@ -26,6 +26,12 @@
 - Khi mã đã áp vào đơn → ghi `sessionStorage['decoco_discount_code']` để popup tự tắt (không mời lại mã trùng).
 - `npm run build` lại: pass.
 
+### Cập nhật sau review lần 2: bẫy Back đặt lại theo từng trang
+- Effect vũ trang giờ phụ thuộc `[suppressed, pathname]` (trước chỉ `[suppressed]`). Mỗi lần đổi trang: cleanup trang cũ (gỡ listener, clear timer) rồi đặt bẫy mới cho trang hiện tại.
+- Nhờ vậy nấc lịch sử giả luôn trỏ **đúng URL trang khách đang đứng** → bấm Back ở `/dat-hang` mở popup **ngay tại `/dat-hang`**, không client-nav về trang trước.
+- Trade-off nhỏ: nếu khách qua nhiều trang mà chưa bung popup, mỗi trang để lại 1 nấc lịch sử giả (tối đa vài nấc, dừng hẳn sau khi popup hiện 1 lần/phiên). Chấp nhận được.
+- `npm run build`: pass.
+
 ---
 
 ## Giai đoạn 1 — Database (Supabase)
@@ -114,8 +120,9 @@
 - [x] `components/marketing/ExitIntentOffer.tsx` (client):
   - [x] Props: `{ enabled: boolean, code: string, title: string, body: string, cta: string, expiresAt?: string | null }`.
   - [x] Guard hiển thị: `localStorage['decoco_exit_offer_v1']` (TTL 7 ngày), `sessionStorage['decoco_exit_offer_shown']`, `sessionStorage['decoco_discount_code']` trống, `usePathname()` không thuộc `/thanh-toan|/cam-on` (**cho hiện ở `/dat-hang`**).
+  - [x] Effect dep `[suppressed, pathname]` → vũ trang lại mỗi khi đổi trang; cleanup gỡ listener + clear timer.
   - [x] Desktop trigger: `matchMedia('(pointer:fine)')` → sau 3s add `mouseout` listener (`!relatedTarget && clientY<=0`).
-  - [x] Mobile trigger: sau 3s `history.pushState` 1 lần + `popstate` → mở popup.
+  - [x] Mobile trigger: sau 3s `history.pushState(null,'',location.href)` (dummy = URL hiện tại) + `popstate` → cú Back đầu gỡ dummy, KHÔNG điều hướng, mở popup ngay trên trang đang đứng. Sau khi `SS_SHOWN` set → không đặt bẫy nữa.
   - [x] UI: overlay + card, tiêu đề/body, chip mã (click copy + toast), nút CTA, nút X. (Đếm ngược nếu `expiresAt` — tùy chọn, có thể để V-next.)
   - [x] CTA: set `sessionStorage['decoco_discount_code']`, set `localStorage` TTL; nếu đang ở `/dat-hang` → `dispatchEvent('decoco:apply-discount')`, ngược lại `router.push('/dat-hang?code=' + code)`.
   - [x] Đóng (X/ESC/overlay): set `localStorage` TTL + `sessionStorage['decoco_exit_offer_shown']='1'`.

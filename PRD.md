@@ -23,7 +23,7 @@
 |---|---|
 | **Hiệu quả** | Exit popup chuyển đổi TB ~2.8%, bản tối ưu 7–10%; kịch bản "giỏ hàng bỏ quên + ưu đãi" đạt cao nhất (~17%). Ưu đãi giảm giá cụ thể ("Giảm ngay 50.000₫") mạnh hơn lời kêu gọi chung chung. |
 | **Phát hiện ý định thoát (desktop)** | Nghe `mouseout`/`mouseleave` khi con trỏ rời mép trên viewport (`clientY <= 0`, `relatedTarget == null`). Chỉ "vũ trang" sau khi khách ở lại trang ≥ 3 giây. |
-| **Mobile / cảm ứng** | Không có `mouseleave`. Dùng tín hiệu thay thế: chặn **nút Back** (history trap) hoặc **cuộn ngược nhanh về đầu trang**. V3 làm: desktop = mouseleave; mobile = back-button trap (1 lần/phiên). |
+| **Mobile / cảm ứng** | Không có `mouseleave`. V3 dùng **back-button trap**: mỗi khi khách ở 1 trang ≥ 3s, chèn 1 nấc lịch sử giả trỏ **đúng URL trang hiện tại**; cú Back đầu tiên chỉ gỡ nấc này (URL không đổi, **không điều hướng**) rồi mở popup ngay trên trang đó. Bẫy được **đặt lại mỗi khi đổi trang** để luôn nhắm đúng trang khách đang định rời. Popup chỉ hiện **1 lần/phiên** (sau đó không đặt bẫy nữa). |
 | **Tần suất / chống phiền** | Sau khi khách đóng hoặc đã bấm nhận → **không hiện lại trong 7 ngày** (lưu `localStorage`). Không hiện quá 1 lần/phiên. |
 | **Không hiện ở đâu** | `/thanh-toan/*`, `/cam-on`, toàn bộ `/admin/*`; và khi đơn đã có mã giảm giá đang áp (`sessionStorage['decoco_discount_code']`). **Vẫn hiện ở `/dat-hang`** — exit-intent lúc rời trang thanh toán chuyển đổi cao nhất; nếu đang ở `/dat-hang`, CTA không điều hướng mà bắn event `decoco:apply-discount` để form tự áp mã. |
 | **Số trường form** | 1–3 trường chuyển đổi tốt nhất; ≥ 4 trường tụt mạnh. → Popup DECOCO **không thu thập email**, chỉ 1 nút CTA "Dùng mã & đặt hàng". |
@@ -187,8 +187,10 @@ Hành vi:
   - Route hiện tại không thuộc `{/thanh-toan, /cam-on}` (và component không tồn tại ở /admin). Ở `/dat-hang` vẫn cho hiện.
   - `sessionStorage['decoco_discount_code']` trống.
 - **Trigger**:
+  - `useEffect` phụ thuộc `[suppressed, pathname]` → **vũ trang lại mỗi khi đổi trang**; cleanup gỡ listener + clear timer của trang trước.
   - Desktop (`matchMedia('(pointer:fine)')`): sau 3s, `document.addEventListener('mouseout')` → nếu `!e.relatedTarget && e.clientY <= 0` → mở popup.
-  - Mobile: sau 3s, `history.pushState(null,'',location.href)` một lần; `popstate` → mở popup (chặn thoát 1 lần). Nếu popup đang mở mà bấm back tiếp → cho thoát.
+  - Mobile: sau 3s, `history.pushState(null,'',location.href)` (dummy = URL trang hiện tại) + listener `popstate` → cú Back đầu chỉ gỡ dummy (không rời trang) → mở popup. Đóng popup rồi bấm Back tiếp → rời trang bình thường.
+  - Sau khi popup đã hiện (`sessionStorage['decoco_exit_offer_shown']`) → không đặt bẫy ở các trang sau nữa (tránh chèn thừa nấc lịch sử).
 - **Nội dung**: tiêu đề, body, mã (hiển thị dạng chip copy được), (tùy chọn) dòng đếm ngược nếu mã có `expires_at`, nút CTA, nút X.
 - **CTA click**:
   - `sessionStorage['decoco_discount_code'] = code`.
