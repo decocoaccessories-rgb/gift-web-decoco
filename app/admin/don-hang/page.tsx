@@ -35,6 +35,8 @@ type OrderRow = Pick<
   | "customer_name"
   | "customer_phone"
   | "customer_email"
+  | "recipient_name"
+  | "recipient_phone"
   | "province"
   | "address"
   | "note"
@@ -217,6 +219,13 @@ export default function AdminOrdersPage() {
                       <td className="px-4 py-3">
                         <p className="font-medium">{order.customer_name}</p>
                         <p className="text-xs text-muted-foreground">{order.customer_phone}</p>
+                        {order.recipient_phone &&
+                          (order.recipient_phone !== order.customer_phone ||
+                            order.recipient_name !== order.customer_name) && (
+                            <p className="text-xs text-primary mt-0.5">
+                              🎁 Nhận: {order.recipient_name} · {order.recipient_phone}
+                            </p>
+                          )}
                       </td>
                       <td className="px-4 py-3 font-semibold text-primary whitespace-nowrap">
                         {formatPrice(order.price_at_order)}

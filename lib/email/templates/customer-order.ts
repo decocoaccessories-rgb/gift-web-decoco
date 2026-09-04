@@ -11,6 +11,8 @@ export interface CustomerOrderEmailData {
     | "customer_name"
     | "customer_phone"
     | "customer_email"
+    | "recipient_name"
+    | "recipient_phone"
     | "province"
     | "address"
     | "note"
@@ -160,7 +162,8 @@ export function renderCustomerOrderEmail(data: CustomerOrderEmailData): {
                     ${row("Tổng thanh toán", `<strong style="color:#7a1f3a;font-size:15px;">${escape(formatPrice(order.price_at_order))}</strong>`)}
                     ${row("Phương thức TT", escape(PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method))}
                     ${row("Trạng thái TT", `<span style="display:inline-block;padding:2px 8px;background-color:${order.payment_status === "paid" ? "#d1fae5" : "#fef3c7"};color:${order.payment_status === "paid" ? "#065f46" : "#92400e"};font-size:11px;font-weight:700;border-radius:4px;text-transform:uppercase;">${escape(PAYMENT_STATUS_LABEL[order.payment_status] ?? order.payment_status)}</span>`)}
-                    ${row("Điện thoại nhận", escape(order.customer_phone))}
+                    ${row("Người nhận hàng", escape(order.recipient_name ?? order.customer_name))}
+                    ${row("Điện thoại nhận", escape(order.recipient_phone ?? order.customer_phone))}
                     ${row("Địa chỉ nhận hàng", `${escape(order.address)}, ${escape(order.province)}`)}
                     ${order.note ? row("Ghi chú khách hàng", `<em style="color:#71717a;">${escape(order.note)}</em>`) : ""}
                   </tbody>

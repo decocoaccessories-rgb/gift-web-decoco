@@ -81,6 +81,8 @@ export interface Database {
           customer_name: string;
           customer_phone: string;
           customer_email: string | null;
+          recipient_name: string | null;
+          recipient_phone: string | null;
           province: string;
           address: string;
           note: string | null;

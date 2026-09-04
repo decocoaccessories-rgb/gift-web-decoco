@@ -14,7 +14,7 @@ import { formatPrice } from "@/lib/utils";
 import provinces from "@/public/data/provinces.json";
 
 const schema = z.object({
-  customer_name: z.string().min(2, "Vui lòng nhập họ tên (tối thiểu 2 ký tự)"),
+  customer_name: z.string().min(2, "Vui lòng nhập họ tên người đặt (tối thiểu 2 ký tự)"),
   customer_phone: z
     .string()
     .regex(/^0\d{9}$/, "Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0)"),
@@ -23,6 +23,12 @@ const schema = z.object({
     .email("Email không hợp lệ")
     .optional()
     .or(z.literal("")),
+  recipient_name: z
+    .string()
+    .min(2, "Vui lòng nhập họ tên người nhận (tối thiểu 2 ký tự)"),
+  recipient_phone: z
+    .string()
+    .regex(/^0\d{9}$/, "Số điện thoại người nhận không hợp lệ (10 số, bắt đầu bằng 0)"),
   province: z.string().min(1, "Vui lòng chọn tỉnh/thành phố"),
   address: z.string().min(10, "Địa chỉ cần tối thiểu 10 ký tự"),
   note: z.string().max(500).optional(),
@@ -47,14 +53,35 @@ export default function CheckoutPage() {
   const [serverError, setServerError] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "vietqr">("vietqr");
   const [policyAgreed, setPolicyAgreed] = useState(false);
+  const [selfReceive, setSelfReceive] = useState(false);
 
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
   });
+
+  const customerName = watch("customer_name");
+  const customerPhone = watch("customer_phone");
+
+  // "Tôi là người nhận hàng": đồng bộ thông tin người đặt sang người nhận.
+  useEffect(() => {
+    if (!selfReceive) return;
+    setValue("recipient_name", customerName ?? "", { shouldValidate: true });
+    setValue("recipient_phone", customerPhone ?? "", { shouldValidate: true });
+  }, [selfReceive, customerName, customerPhone, setValue]);
+
+  function toggleSelfReceive(checked: boolean) {
+    setSelfReceive(checked);
+    if (!checked) {
+      setValue("recipient_name", "");
+      setValue("recipient_phone", "");
+    }
+  }
 
   useEffect(() => {
     try {
@@ -135,67 +162,156 @@ export default function CheckoutPage() {
         {/* Form */}
         <div className="md:col-span-2">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-            {/* Name */}
-            <div className="space-y-1.5">
-              <Label htmlFor="customer_name">Họ và tên *</Label>
-              <Input
-                id="customer_name"
-                placeholder="Nguyễn Văn A"
-                autoComplete="name"
-                {...register("customer_name")}
-                aria-invalid={!!errors.customer_name}
-              />
-              {errors.customer_name && (
-                <p className="text-xs text-destructive">
-                  {errors.customer_name.message}
+            {/* ===== Section 1: Người đặt hàng ===== */}
+            <div className="rounded-xl border border-border p-4 space-y-4">
+              <div>
+                <h2 className="text-sm font-semibold">
+                  Thông tin người đặt
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  DECOCO sẽ liên hệ số này để xác nhận đơn trước khi giao. Thông
+                  tin người nhận quà nằm ở mục bên dưới.
                 </p>
-              )}
+              </div>
+
+              {/* Name */}
+              <div className="space-y-1.5">
+                <Label htmlFor="customer_name">Họ và tên người đặt *</Label>
+                <Input
+                  id="customer_name"
+                  placeholder="Nguyễn Văn A"
+                  autoComplete="name"
+                  {...register("customer_name")}
+                  aria-invalid={!!errors.customer_name}
+                />
+                {errors.customer_name && (
+                  <p className="text-xs text-destructive">
+                    {errors.customer_name.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-1.5">
+                <Label htmlFor="customer_phone">Số điện thoại người đặt *</Label>
+                <Input
+                  id="customer_phone"
+                  type="tel"
+                  placeholder="0901234567"
+                  autoComplete="tel"
+                  {...register("customer_phone")}
+                  aria-invalid={!!errors.customer_phone}
+                />
+                <p className="text-xs text-muted-foreground">
+                  DECOCO sẽ gọi số này để xác nhận đơn (không gọi người nhận quà).
+                </p>
+                {errors.customer_phone && (
+                  <p className="text-xs text-destructive">
+                    {errors.customer_phone.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Email */}
+              <div className="space-y-1.5">
+                <Label htmlFor="customer_email">
+                  Email người đặt{" "}
+                  <span className="text-muted-foreground font-normal text-xs">
+                    (không bắt buộc)
+                  </span>
+                </Label>
+                <Input
+                  id="customer_email"
+                  type="email"
+                  placeholder="example@email.com"
+                  autoComplete="email"
+                  {...register("customer_email")}
+                  aria-invalid={!!errors.customer_email}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nhận email biên nhận và cập nhật tiến độ đơn hàng.
+                </p>
+                {errors.customer_email && (
+                  <p className="text-xs text-destructive">
+                    {errors.customer_email.message}
+                  </p>
+                )}
+              </div>
             </div>
 
-            {/* Phone */}
-            <div className="space-y-1.5">
-              <Label htmlFor="customer_phone">Số điện thoại *</Label>
-              <Input
-                id="customer_phone"
-                type="tel"
-                placeholder="0901234567"
-                autoComplete="tel"
-                {...register("customer_phone")}
-                aria-invalid={!!errors.customer_phone}
+            {/* Self-receive shortcut */}
+            <label className="flex items-start gap-2.5 rounded-lg border border-input p-3 cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-primary/5 transition-colors">
+              <input
+                type="checkbox"
+                checked={selfReceive}
+                onChange={(e) => toggleSelfReceive(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-primary"
               />
-              {errors.customer_phone && (
-                <p className="text-xs text-destructive">
-                  {errors.customer_phone.message}
-                </p>
-              )}
-            </div>
-
-            {/* Email */}
-            <div className="space-y-1.5">
-              <Label htmlFor="customer_email">
-                Email{" "}
-                <span className="text-muted-foreground font-normal text-xs">
-                  (không bắt buộc)
+              <span className="text-sm">
+                Tôi là người nhận hàng (tự mua cho bản thân)
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  Tự động dùng tên và SĐT người đặt làm thông tin người nhận.
                 </span>
-              </Label>
-              <Input
-                id="customer_email"
-                type="email"
-                placeholder="example@email.com"
-                autoComplete="email"
-                {...register("customer_email")}
-                aria-invalid={!!errors.customer_email}
-              />
-              {errors.customer_email && (
-                <p className="text-xs text-destructive">
-                  {errors.customer_email.message}
-                </p>
-              )}
-            </div>
+              </span>
+            </label>
 
-            {/* Province */}
-            <div className="space-y-1.5">
-              <Label htmlFor="province">Tỉnh/Thành phố *</Label>
+            {/* ===== Section 2: Người nhận hàng ===== */}
+            <div className="rounded-xl border border-border p-4 space-y-4">
+              <div>
+                <h2 className="text-sm font-semibold">
+                  Thông tin người nhận hàng
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Đơn vị vận chuyển sẽ giao tới địa chỉ và liên hệ số điện thoại
+                  này.
+                </p>
+              </div>
+
+              {!selfReceive && (
+                <>
+                  {/* Recipient name */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="recipient_name">Họ và tên người nhận *</Label>
+                    <Input
+                      id="recipient_name"
+                      placeholder="Trần Thị B"
+                      {...register("recipient_name")}
+                      aria-invalid={!!errors.recipient_name}
+                    />
+                    {errors.recipient_name && (
+                      <p className="text-xs text-destructive">
+                        {errors.recipient_name.message}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Recipient phone */}
+                  <div className="space-y-1.5">
+                    <Label htmlFor="recipient_phone">
+                      Số điện thoại người nhận *
+                    </Label>
+                    <Input
+                      id="recipient_phone"
+                      type="tel"
+                      placeholder="0909876543"
+                      {...register("recipient_phone")}
+                      aria-invalid={!!errors.recipient_phone}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Shipper sẽ gọi số này khi phát hàng.
+                    </p>
+                    {errors.recipient_phone && (
+                      <p className="text-xs text-destructive">
+                        {errors.recipient_phone.message}
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Province */}
+              <div className="space-y-1.5">
+                <Label htmlFor="province">Tỉnh/Thành phố *</Label>
               <select
                 id="province"
                 {...register("province")}
@@ -252,6 +368,8 @@ export default function CheckoutPage() {
                 className="flex w-full rounded-lg border border-input bg-transparent px-2.5 py-2 text-sm transition-colors placeholder:text-muted-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
               />
             </div>
+            </div>
+            {/* ===== End Section 2 ===== */}
 
             {/* Payment method */}
             <div className="space-y-2">

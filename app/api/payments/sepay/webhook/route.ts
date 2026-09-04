@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
   // 5. Tìm đơn vietqr theo nội dung đã chuẩn hoá.
   const { data: order } = await supabase
     .from("orders")
-    .select("id, order_number, product_id, price_at_order, payment_status, payment_method, variant_name, customer_email, customer_name, customer_phone, province, address, note, created_at")
+    .select("id, order_number, product_id, price_at_order, payment_status, payment_method, variant_name, customer_email, customer_name, customer_phone, recipient_name, recipient_phone, province, address, note, created_at")
     .eq("vietqr_content", ref)
     .eq("payment_method", "vietqr")
     .maybeSingle();

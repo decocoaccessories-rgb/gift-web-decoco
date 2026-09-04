@@ -13,6 +13,8 @@ type OrderRow = Pick<
   | "customer_name"
   | "customer_phone"
   | "customer_email"
+  | "recipient_name"
+  | "recipient_phone"
   | "province"
   | "address"
   | "note"
@@ -53,6 +55,12 @@ interface Props {
 }
 
 export default function OrderDetailDialog({ order, onClose }: Props) {
+  // Người nhận có thể khác người đặt (đơn tặng quà). Fallback về customer_* cho đơn cũ.
+  const recipientName = order.recipient_name ?? order.customer_name;
+  const recipientPhone = order.recipient_phone ?? order.customer_phone;
+  const isGift =
+    recipientName !== order.customer_name || recipientPhone !== order.customer_phone;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
@@ -101,10 +109,10 @@ export default function OrderDetailDialog({ order, onClose }: Props) {
             </div>
           )}
 
-          {/* Customer info */}
+          {/* Người đặt — CSKH gọi xác nhận */}
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Thông tin khách hàng
+              Người đặt · gọi xác nhận đơn
             </p>
             <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-sm">
               <dt className="text-muted-foreground">Họ tên</dt>
@@ -121,6 +129,26 @@ export default function OrderDetailDialog({ order, onClose }: Props) {
                   <dd>{order.customer_email}</dd>
                 </>
               )}
+            </dl>
+          </div>
+
+          {/* Người nhận — shipper giao hàng */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Người nhận · shipper giao hàng
+              {isGift && (
+                <span className="ml-2 text-primary normal-case">🎁 đơn tặng quà</span>
+              )}
+            </p>
+            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-sm">
+              <dt className="text-muted-foreground">Họ tên</dt>
+              <dd className="font-medium">{recipientName}</dd>
+              <dt className="text-muted-foreground">SĐT</dt>
+              <dd>
+                <a href={`tel:${recipientPhone}`} className="text-primary hover:underline">
+                  {recipientPhone}
+                </a>
+              </dd>
               <dt className="text-muted-foreground">Tỉnh/TP</dt>
               <dd>{order.province}</dd>
               <dt className="text-muted-foreground">Địa chỉ</dt>

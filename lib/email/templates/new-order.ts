@@ -9,6 +9,8 @@ export interface NewOrderEmailData {
     | "customer_name"
     | "customer_phone"
     | "customer_email"
+    | "recipient_name"
+    | "recipient_phone"
     | "province"
     | "address"
     | "note"
@@ -62,6 +64,12 @@ export function renderNewOrderEmail(data: NewOrderEmailData): {
   const created = new Date(order.created_at).toLocaleString("vi-VN");
   const adminLink = `${appUrl.replace(/\/$/, "")}/admin/don-hang`;
 
+  // Người nhận có thể khác người đặt (đơn tặng quà). Fallback về customer_* cho đơn cũ.
+  const recipientName = order.recipient_name ?? order.customer_name;
+  const recipientPhone = order.recipient_phone ?? order.customer_phone;
+  const isGift =
+    recipientPhone !== order.customer_phone || recipientName !== order.customer_name;
+
   const html = `<!doctype html>
 <html lang="vi">
 <head><meta charset="utf-8"><title>${escape(subject)}</title></head>
@@ -74,9 +82,11 @@ export function renderNewOrderEmail(data: NewOrderEmailData): {
 
     <table style="width:100%;border-collapse:collapse;">
       <tbody>
-        ${row("Khách hàng", `<strong>${escape(order.customer_name)}</strong>`)}
-        ${row("SĐT", `<a href="tel:${escape(order.customer_phone)}" style="color:#7a1f3a;">${escape(order.customer_phone)}</a>`)}
-        ${order.customer_email ? row("Email", escape(order.customer_email)) : ""}
+        ${row("Người đặt", `<strong>${escape(order.customer_name)}</strong>${isGift ? ' <span style="color:#7a1f3a;">🎁 đơn tặng quà</span>' : ""}`)}
+        ${row("SĐT gọi xác nhận", `<a href="tel:${escape(order.customer_phone)}" style="color:#7a1f3a;">${escape(order.customer_phone)}</a>`)}
+        ${order.customer_email ? row("Email người đặt", escape(order.customer_email)) : ""}
+        ${row("Người nhận", `<strong>${escape(recipientName)}</strong>`)}
+        ${row("SĐT giao hàng", `<a href="tel:${escape(recipientPhone)}" style="color:#7a1f3a;">${escape(recipientPhone)}</a>`)}
         ${row("Tỉnh/TP", escape(order.province))}
         ${row("Địa chỉ", escape(order.address))}
         ${order.note ? row("Ghi chú", `<em>${escape(order.note)}</em>`) : ""}

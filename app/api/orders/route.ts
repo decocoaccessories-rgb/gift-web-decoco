@@ -38,6 +38,10 @@ const orderSchema = z.object({
     .string()
     .regex(/^0\d{9}$/, "Số điện thoại không hợp lệ (10 số, bắt đầu bằng 0)"),
   customer_email: z.string().email().optional().or(z.literal("")),
+  recipient_name: z.string().min(2).max(100),
+  recipient_phone: z
+    .string()
+    .regex(/^0\d{9}$/, "Số điện thoại người nhận không hợp lệ (10 số, bắt đầu bằng 0)"),
   province: z.string().min(1),
   address: z.string().min(10),
   note: z.string().max(500).optional(),
@@ -156,6 +160,8 @@ export async function POST(request: NextRequest) {
       customer_name: data.customer_name,
       customer_phone: data.customer_phone,
       customer_email: data.customer_email || null,
+      recipient_name: data.recipient_name,
+      recipient_phone: data.recipient_phone,
       province: data.province,
       address: data.address,
       note: data.note ?? null,
@@ -166,7 +172,7 @@ export async function POST(request: NextRequest) {
       vnp_txn_ref: txnRef,
       ...vietqrColumns,
     })
-    .select("id, order_number, customer_name, customer_phone, customer_email, province, address, note, price_at_order, variant_name, design_image_url, payment_method, payment_status, created_at")
+    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, province, address, note, price_at_order, variant_name, design_image_url, payment_method, payment_status, created_at")
     .single();
 
   if (insertError || !order) {
@@ -283,13 +289,13 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   let query = admin
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_email, province, address, note, status, price_at_order, design_image_url, variant_name, payment_method, payment_status, paid_at, created_at, product_id", { count: "exact" })
+    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, province, address, note, status, price_at_order, design_image_url, variant_name, payment_method, payment_status, paid_at, created_at, product_id", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (status && status !== "all") query = query.eq("status", status);
   if (search) {
-    query = query.or(`customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,order_number.ilike.%${search}%`);
+    query = query.or(`customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%,recipient_name.ilike.%${search}%,recipient_phone.ilike.%${search}%,order_number.ilike.%${search}%`);
   }
 
   const { data, error, count } = await query;
