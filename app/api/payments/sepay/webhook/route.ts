@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
   // 5. Tìm đơn vietqr theo nội dung đã chuẩn hoá.
   const { data: order } = await supabase
     .from("orders")
-    .select("id, order_number, product_id, price_at_order, payment_status, payment_method, variant_name, customer_email, customer_name, customer_phone, recipient_name, recipient_phone, province, address, note, created_at")
+    .select("id, order_number, product_id, price_at_order, payment_status, payment_method, variant_name, customer_email, customer_name, customer_phone, recipient_name, recipient_phone, discount_code, discount_amount, province, address, note, created_at")
     .eq("vietqr_content", ref)
     .eq("payment_method", "vietqr")
     .maybeSingle();
@@ -163,6 +163,16 @@ export async function POST(request: NextRequest) {
           .update({ stock: Math.max(0, product.stock - 1) })
           .eq("id", order.product_id);
       }
+    }
+  }
+
+  // 9b. Trừ lượt mã giảm giá (idempotent theo order_id; mirror trừ kho).
+  if (order.discount_code) {
+    const { error: finErr } = await supabase.rpc("finalize_discount_redemption", {
+      p_order_id: order.id,
+    });
+    if (finErr) {
+      console.error("[SePay webhook] finalize_discount_redemption failed:", finErr);
     }
   }
 

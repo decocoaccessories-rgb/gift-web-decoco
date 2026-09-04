@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { LayoutDashboard, Package, FileText, Layers, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, FileText, Layers, Ticket, LogOut } from "lucide-react";
 
 const sidebarLinks = [
   { label: "Đơn hàng", href: "/admin/don-hang", icon: LayoutDashboard },
   { label: "Sản phẩm", href: "/admin/san-pham", icon: Package },
+  { label: "Mã giảm giá", href: "/admin/ma-giam-gia", icon: Ticket },
   { label: "Nội dung", href: "/admin/noi-dung", icon: FileText },
   { label: "Khung thiết kế", href: "/admin/khung", icon: Layers },
 ];

@@ -13,6 +13,8 @@ export interface CustomerOrderEmailData {
     | "customer_email"
     | "recipient_name"
     | "recipient_phone"
+    | "discount_code"
+    | "discount_amount"
     | "province"
     | "address"
     | "note"
@@ -159,7 +161,12 @@ export function renderCustomerOrderEmail(data: CustomerOrderEmailData): {
                     ${row("Mã đơn hàng", `<strong style="font-family:monospace;font-size:14px;color:#7a1f3a;">${escape(order.order_number)}</strong>`)}
                     ${productName ? row("Sản phẩm thiết kế", `<strong>${escape(productName)}</strong>`) : ""}
                     ${order.variant_name ? row("Phân loại", escape(order.variant_name)) : ""}
-                    ${row("Tổng thanh toán", `<strong style="color:#7a1f3a;font-size:15px;">${escape(formatPrice(order.price_at_order))}</strong>`)}
+                    ${
+                      order.discount_amount > 0
+                        ? row("Mã giảm giá", `${escape(order.discount_code)} · <span style="color:#7a1f3a;">− ${escape(formatPrice(order.discount_amount))}</span>`) +
+                          row("Tổng thanh toán", `<span style="text-decoration:line-through;color:#a1a1aa;">${escape(formatPrice(order.price_at_order + order.discount_amount))}</span> <strong style="color:#7a1f3a;font-size:15px;">${escape(formatPrice(order.price_at_order))}</strong>`)
+                        : row("Tổng thanh toán", `<strong style="color:#7a1f3a;font-size:15px;">${escape(formatPrice(order.price_at_order))}</strong>`)
+                    }
                     ${row("Phương thức TT", escape(PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method))}
                     ${row("Trạng thái TT", `<span style="display:inline-block;padding:2px 8px;background-color:${order.payment_status === "paid" ? "#d1fae5" : "#fef3c7"};color:${order.payment_status === "paid" ? "#065f46" : "#92400e"};font-size:11px;font-weight:700;border-radius:4px;text-transform:uppercase;">${escape(PAYMENT_STATUS_LABEL[order.payment_status] ?? order.payment_status)}</span>`)}
                     ${row("Người nhận hàng", escape(order.recipient_name ?? order.customer_name))}

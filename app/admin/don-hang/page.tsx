@@ -37,6 +37,8 @@ type OrderRow = Pick<
   | "customer_email"
   | "recipient_name"
   | "recipient_phone"
+  | "discount_code"
+  | "discount_amount"
   | "province"
   | "address"
   | "note"
@@ -229,6 +231,11 @@ export default function AdminOrdersPage() {
                       </td>
                       <td className="px-4 py-3 font-semibold text-primary whitespace-nowrap">
                         {formatPrice(order.price_at_order)}
+                        {order.discount_amount > 0 && (
+                          <span className="block text-[10px] font-normal text-muted-foreground">
+                            🏷️ {order.discount_code} −{formatPrice(order.discount_amount)}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex flex-col gap-0.5">

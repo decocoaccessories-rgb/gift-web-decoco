@@ -9,6 +9,7 @@ export type Json =
 export type OrderStatus = "new" | "confirmed" | "shipping" | "done" | "cancelled";
 export type PaymentMethod = "cod" | "vnpay" | "vietqr";
 export type PaymentStatus = "pending" | "paid" | "failed" | "cancelled";
+export type DiscountType = "fixed" | "percent";
 export type SiteContentType = "text" | "image" | "richtext" | "url";
 export type PhotoSlotShape = "rect" | "circle" | "rounded-rect";
 
@@ -83,6 +84,8 @@ export interface Database {
           customer_email: string | null;
           recipient_name: string | null;
           recipient_phone: string | null;
+          discount_code: string | null;
+          discount_amount: number;
           province: string;
           address: string;
           note: string | null;
@@ -102,6 +105,40 @@ export interface Database {
         };
         Insert: Omit<Database["public"]["Tables"]["orders"]["Row"], "id" | "created_at" | "updated_at">;
         Update: Partial<Database["public"]["Tables"]["orders"]["Insert"]>;
+      };
+      discount_codes: {
+        Row: {
+          id: string;
+          code: string;
+          description: string | null;
+          discount_type: DiscountType;
+          discount_value: number;
+          max_discount_amount: number | null;
+          min_order_amount: number;
+          starts_at: string | null;
+          expires_at: string | null;
+          usage_limit: number | null;
+          usage_count: number;
+          per_customer_limit: number | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["discount_codes"]["Row"], "id" | "usage_count" | "created_at" | "updated_at"> & { usage_count?: number };
+        Update: Partial<Database["public"]["Tables"]["discount_codes"]["Insert"]>;
+      };
+      discount_redemptions: {
+        Row: {
+          id: string;
+          discount_code_id: string;
+          order_id: string | null;
+          code: string;
+          customer_phone: string;
+          amount: number;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["discount_redemptions"]["Row"], "id" | "created_at">;
+        Update: Partial<Database["public"]["Tables"]["discount_redemptions"]["Insert"]>;
       };
       site_content: {
         Row: {
@@ -158,6 +195,8 @@ export interface Database {
 export type Product = Database["public"]["Tables"]["products"]["Row"];
 export type Frame = Database["public"]["Tables"]["frames"]["Row"];
 export type Order = Database["public"]["Tables"]["orders"]["Row"];
+export type DiscountCode = Database["public"]["Tables"]["discount_codes"]["Row"];
+export type DiscountRedemption = Database["public"]["Tables"]["discount_redemptions"]["Row"];
 export type SiteContent = Database["public"]["Tables"]["site_content"]["Row"];
 export type FaqItem = Database["public"]["Tables"]["faq_items"]["Row"];
 export type FeedbackItem = Database["public"]["Tables"]["feedback_items"]["Row"];

@@ -15,6 +15,8 @@ type OrderRow = Pick<
   | "customer_email"
   | "recipient_name"
   | "recipient_phone"
+  | "discount_code"
+  | "discount_amount"
   | "province"
   | "address"
   | "note"
@@ -174,8 +176,24 @@ export default function OrderDetailDialog({ order, onClose }: Props) {
                   <dd className="font-medium">{order.variant_name}</dd>
                 </>
               )}
+              {order.discount_amount > 0 && (
+                <>
+                  <dt className="text-muted-foreground">Mã giảm giá</dt>
+                  <dd>
+                    <span className="font-mono">{order.discount_code}</span>{" "}
+                    <span className="text-primary">− {formatPrice(order.discount_amount)}</span>
+                  </dd>
+                </>
+              )}
               <dt className="text-muted-foreground">Giá trị</dt>
-              <dd className="font-semibold text-primary">{formatPrice(order.price_at_order)}</dd>
+              <dd className="font-semibold text-primary">
+                {order.discount_amount > 0 && (
+                  <span className="mr-1.5 font-normal text-muted-foreground line-through">
+                    {formatPrice(order.price_at_order + order.discount_amount)}
+                  </span>
+                )}
+                {formatPrice(order.price_at_order)}
+              </dd>
               <dt className="text-muted-foreground">Trạng thái</dt>
               <dd>{STATUS_LABELS[order.status] ?? order.status}</dd>
               <dt className="text-muted-foreground">Phương thức TT</dt>

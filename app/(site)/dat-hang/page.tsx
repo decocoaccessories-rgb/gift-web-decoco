@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -54,6 +54,12 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<"cod" | "vnpay" | "vietqr">("vietqr");
   const [policyAgreed, setPolicyAgreed] = useState(false);
   const [selfReceive, setSelfReceive] = useState(false);
+  const [discountInput, setDiscountInput] = useState("");
+  const [discountApplied, setDiscountApplied] = useState<
+    { code: string; discount_amount: number; final_amount: number } | null
+  >(null);
+  const [discountError, setDiscountError] = useState("");
+  const [discountChecking, setDiscountChecking] = useState(false);
 
   const {
     register,
@@ -92,6 +98,73 @@ export default function CheckoutPage() {
     }
   }, []);
 
+  const subtotal = designInfo?.productPrice ?? 0;
+  const orderTotal = discountApplied ? discountApplied.final_amount : subtotal;
+
+  const applyDiscount = useCallback(
+    async (rawCode: string) => {
+      const code = rawCode.trim().toUpperCase();
+      if (!code || !designInfo) return;
+      setDiscountChecking(true);
+      setDiscountError("");
+      try {
+        const res = await fetch("/api/discounts/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, order_amount: designInfo.productPrice }),
+        });
+        const data = await res.json();
+        if (res.ok && data.valid) {
+          setDiscountApplied({
+            code: data.code,
+            discount_amount: data.discount_amount,
+            final_amount: data.final_amount,
+          });
+          setDiscountInput(data.code);
+        } else {
+          setDiscountApplied(null);
+          setDiscountError(data.message ?? "Mã giảm giá không hợp lệ.");
+        }
+      } catch {
+        setDiscountApplied(null);
+        setDiscountError("Không kiểm tra được mã, vui lòng thử lại.");
+      } finally {
+        setDiscountChecking(false);
+      }
+    },
+    [designInfo]
+  );
+
+  function removeDiscount() {
+    setDiscountApplied(null);
+    setDiscountError("");
+    setDiscountInput("");
+    try {
+      sessionStorage.removeItem("decoco_discount_code");
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Prefill mã từ ?code= hoặc sessionStorage (popup exit-intent) rồi tự áp.
+  useEffect(() => {
+    if (!designInfo || discountApplied) return;
+    let prefill = "";
+    try {
+      prefill =
+        new URLSearchParams(window.location.search).get("code") ??
+        sessionStorage.getItem("decoco_discount_code") ??
+        "";
+    } catch {
+      /* ignore */
+    }
+    if (prefill) {
+      setDiscountInput(prefill);
+      applyDiscount(prefill);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [designInfo]);
+
   async function onSubmit(values: FormValues) {
     if (!designInfo) {
       setServerError("Không tìm thấy thông tin thiết kế. Vui lòng quay lại chọn sản phẩm.");
@@ -114,6 +187,7 @@ export default function CheckoutPage() {
             : undefined,
           variant_name: designInfo.variantName ?? null,
           payment_method: paymentMethod,
+          discount_code: discountApplied?.code ?? undefined,
           ...values,
         }),
       });
@@ -123,6 +197,10 @@ export default function CheckoutPage() {
       if (!res.ok) {
         if (res.status === 409) {
           setServerError("Rất tiếc, sản phẩm vừa hết hàng. Vui lòng chọn sản phẩm khác.");
+        } else if (res.status === 422 && data.discount_error) {
+          setDiscountApplied(null);
+          setDiscountError(data.discount_error);
+          setServerError("Mã giảm giá không còn hợp lệ. Vui lòng bỏ mã hoặc nhập mã khác rồi đặt lại.");
         } else {
           setServerError(data.error ?? "Có lỗi xảy ra, vui lòng thử lại.");
         }
@@ -130,6 +208,11 @@ export default function CheckoutPage() {
       }
 
       sessionStorage.removeItem("decoco_design");
+      try {
+        sessionStorage.removeItem("decoco_discount_code");
+      } catch {
+        /* ignore */
+      }
 
       if (data.paymentUrl) {
         window.location.href = data.paymentUrl as string;
@@ -371,6 +454,52 @@ export default function CheckoutPage() {
             </div>
             {/* ===== End Section 2 ===== */}
 
+            {/* Discount code */}
+            <div className="space-y-1.5">
+              <Label htmlFor="discount_code">
+                Mã giảm giá{" "}
+                <span className="text-muted-foreground font-normal text-xs">
+                  (không bắt buộc)
+                </span>
+              </Label>
+              {discountApplied ? (
+                <div className="flex items-center justify-between rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
+                  <span>
+                    ✓ Đã áp mã <strong>{discountApplied.code}</strong> — giảm{" "}
+                    {formatPrice(discountApplied.discount_amount)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={removeDiscount}
+                    className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    Bỏ
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Input
+                    id="discount_code"
+                    placeholder="Nhập mã (vd. GIAM50K)"
+                    value={discountInput}
+                    onChange={(e) => setDiscountInput(e.target.value.toUpperCase())}
+                    className="uppercase"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => applyDiscount(discountInput)}
+                    disabled={discountChecking || !discountInput.trim()}
+                  >
+                    {discountChecking ? "Đang kiểm tra..." : "Áp dụng"}
+                  </Button>
+                </div>
+              )}
+              {discountError && (
+                <p className="text-xs text-destructive">{discountError}</p>
+              )}
+            </div>
+
             {/* Payment method */}
             <div className="space-y-2">
               <Label>Phương thức thanh toán *</Label>
@@ -491,12 +620,22 @@ export default function CheckoutPage() {
                 </div>
                 <div className="text-xs text-muted-foreground border-t border-border pt-3 space-y-1">
                   <div className="flex justify-between">
+                    <span>Tạm tính</span>
+                    <span>{formatPrice(subtotal)}</span>
+                  </div>
+                  <div className="flex justify-between">
                     <span>Vận chuyển</span>
                     <span>Miễn phí</span>
                   </div>
+                  {discountApplied && (
+                    <div className="flex justify-between text-primary">
+                      <span>Giảm giá ({discountApplied.code})</span>
+                      <span>− {formatPrice(discountApplied.discount_amount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-semibold text-sm text-foreground mt-1">
                     <span>Tổng</span>
-                    <span>{formatPrice(designInfo.productPrice)}</span>
+                    <span>{formatPrice(orderTotal)}</span>
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground bg-secondary/40 rounded-md px-3 py-2">

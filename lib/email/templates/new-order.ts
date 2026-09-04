@@ -11,6 +11,8 @@ export interface NewOrderEmailData {
     | "customer_email"
     | "recipient_name"
     | "recipient_phone"
+    | "discount_code"
+    | "discount_amount"
     | "province"
     | "address"
     | "note"
@@ -92,7 +94,12 @@ export function renderNewOrderEmail(data: NewOrderEmailData): {
         ${order.note ? row("Ghi chú", `<em>${escape(order.note)}</em>`) : ""}
         ${productName ? row("Sản phẩm", `<strong>${escape(productName)}</strong>`) : ""}
         ${order.variant_name ? row("Phân loại", escape(order.variant_name)) : ""}
-        ${row("Giá trị", `<strong style="color:#7a1f3a;">${escape(formatPrice(order.price_at_order))}</strong>`)}
+        ${
+          order.discount_amount > 0
+            ? row("Mã giảm giá", `${escape(order.discount_code)} · <span style="color:#7a1f3a;">− ${escape(formatPrice(order.discount_amount))}</span>`) +
+              row("Giá trị", `<span style="text-decoration:line-through;color:#999;">${escape(formatPrice(order.price_at_order + order.discount_amount))}</span> <strong style="color:#7a1f3a;">${escape(formatPrice(order.price_at_order))}</strong>`)
+            : row("Giá trị", `<strong style="color:#7a1f3a;">${escape(formatPrice(order.price_at_order))}</strong>`)
+        }
         ${row("Phương thức TT", escape(PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method))}
         ${row("TT trạng thái", escape(PAYMENT_STATUS_LABEL[order.payment_status] ?? order.payment_status))}
         ${order.design_image_url ? row("Ảnh thiết kế", `<a href="${escape(order.design_image_url)}" style="color:#7a1f3a;">Tải ảnh</a>`) : ""}

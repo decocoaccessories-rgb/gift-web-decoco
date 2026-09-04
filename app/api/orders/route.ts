@@ -10,6 +10,7 @@ import {
   vietqrExpiresAt,
 } from "@/lib/vietqr";
 import { sendNewOrderEmail, sendCustomerOrderEmail } from "@/lib/email";
+import { normalizeCode, isValidCodeFormat, discountReasonMessage } from "@/lib/discounts";
 import type { Order, Product, ProductVariant } from "@/lib/supabase/types";
 
 // Simple in-memory rate limiter: 5 POST requests per IP per minute
@@ -42,6 +43,7 @@ const orderSchema = z.object({
   recipient_phone: z
     .string()
     .regex(/^0\d{9}$/, "Số điện thoại người nhận không hợp lệ (10 số, bắt đầu bằng 0)"),
+  discount_code: z.string().trim().min(3).max(40).optional(),
   province: z.string().min(1),
   address: z.string().min(10),
   note: z.string().max(500).optional(),
@@ -106,9 +108,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Sản phẩm đã hết hàng" }, { status: 409 });
   }
 
-  const orderNumber = generateOrderNumber();
   const isVnpay = data.payment_method === "vnpay";
   const isVietqr = data.payment_method === "vietqr";
+
+  // Mã giảm giá: re-validate ở server, KHÔNG tin số tiền từ client.
+  // price_at_order = số tiền khách trả (đã trừ giảm) -> QR/URL/đối soát webhook giữ nguyên.
+  let finalPrice = product.price;
+  let discountAmount = 0;
+  let discountCodeToStore: string | null = null;
+
+  if (data.discount_code) {
+    const code = normalizeCode(data.discount_code);
+    if (!isValidCodeFormat(code)) {
+      return NextResponse.json(
+        { error: "Mã giảm giá không hợp lệ", discount_error: discountReasonMessage("not_found") },
+        { status: 422 }
+      );
+    }
+    const { data: vRes, error: vErr } = await supabase.rpc("validate_discount_code", {
+      p_code: code,
+      p_order_amount: product.price,
+      p_customer_phone: data.customer_phone,
+    });
+    if (vErr) {
+      console.error("[orders] validate_discount_code error:", vErr);
+      return NextResponse.json({ error: "Không kiểm tra được mã giảm giá" }, { status: 500 });
+    }
+    const v = vRes as { valid: boolean; reason: string; discount_amount: number; final_amount: number };
+    if (!v.valid) {
+      return NextResponse.json(
+        { error: "Mã giảm giá không hợp lệ", discount_error: discountReasonMessage(v.reason) },
+        { status: 422 }
+      );
+    }
+    // Cổng online không nhận số tiền quá nhỏ.
+    if (data.payment_method !== "cod" && v.final_amount < 1000) {
+      return NextResponse.json(
+        {
+          error: "Mã giảm giá không hợp lệ",
+          discount_error: "Số tiền sau giảm quá nhỏ cho thanh toán online, vui lòng chọn COD.",
+        },
+        { status: 422 }
+      );
+    }
+    finalPrice = v.final_amount;
+    discountAmount = v.discount_amount;
+    discountCodeToStore = code;
+  }
+
+  const orderNumber = generateOrderNumber();
   const txnRef = isVnpay
     ? `${orderNumber}_${Date.now().toString(36)}`.replace(/-/g, "_")
     : null;
@@ -127,7 +175,7 @@ export async function POST(request: NextRequest) {
   let vietqrQrUrl: string | null = null;
   if (isVietqr) {
     try {
-      vietqrQrUrl = buildVietqrImageUrl({ amount: product.price, content: vietqrContent! });
+      vietqrQrUrl = buildVietqrImageUrl({ amount: finalPrice, content: vietqrContent! });
     } catch (err) {
       console.error("VietQR build QR url failed:", err);
       return NextResponse.json(
@@ -165,14 +213,16 @@ export async function POST(request: NextRequest) {
       province: data.province,
       address: data.address,
       note: data.note ?? null,
-      price_at_order: product.price,
+      price_at_order: finalPrice,
+      discount_code: discountCodeToStore,
+      discount_amount: discountAmount,
       status: "new",
       payment_method: data.payment_method,
       payment_status: "pending",
       vnp_txn_ref: txnRef,
       ...vietqrColumns,
     })
-    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, province, address, note, price_at_order, variant_name, design_image_url, payment_method, payment_status, created_at")
+    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, discount_code, discount_amount, province, address, note, price_at_order, variant_name, design_image_url, payment_method, payment_status, created_at")
     .single();
 
   if (insertError || !order) {
@@ -200,7 +250,7 @@ export async function POST(request: NextRequest) {
     try {
       paymentUrl = buildVnpayPaymentUrl({
         txnRef: txnRef!,
-        amount: product.price,
+        amount: finalPrice,
         ipAddr: ip === "unknown" ? "127.0.0.1" : ip,
         orderInfo: `Thanh toan don hang ${orderNumber}`,
       });
@@ -211,7 +261,7 @@ export async function POST(request: NextRequest) {
         event_type: "initiate",
         ip_address: ip === "unknown" ? "127.0.0.1" : ip,
         payload: {
-          amount: product.price,
+          amount: finalPrice,
           orderInfo: `Thanh toan don hang ${orderNumber}`,
         },
         response: {
@@ -267,6 +317,19 @@ export async function POST(request: NextRequest) {
       .eq("id", data.product_id);
   }
 
+  // COD: trừ lượt mã giảm giá ngay (fail-soft — mã đã được validate ở trên).
+  if (discountCodeToStore) {
+    const { error: redeemErr } = await supabase.rpc("redeem_discount_code", {
+      p_code: discountCodeToStore,
+      p_order_id: order.id,
+      p_order_amount: product.price,
+      p_customer_phone: data.customer_phone,
+    });
+    if (redeemErr) {
+      console.warn(`[orders] redeem_discount_code failed for ${order.order_number}:`, redeemErr.message);
+    }
+  }
+
   return NextResponse.json(
     { orderId: order.id, orderNumber: order.order_number },
     { status: 201 }
@@ -289,7 +352,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   let query = admin
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, province, address, note, status, price_at_order, design_image_url, variant_name, payment_method, payment_status, paid_at, created_at, product_id", { count: "exact" })
+    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, discount_code, discount_amount, province, address, note, status, price_at_order, design_image_url, variant_name, payment_method, payment_status, paid_at, created_at, product_id", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

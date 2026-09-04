@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
 
   const { data: order } = await supabase
     .from("orders")
-    .select("id, product_id, price_at_order, payment_status, variant_name")
+    .select("id, product_id, price_at_order, payment_status, variant_name, discount_code")
     .eq("vnp_txn_ref", txnRef)
     .single();
 
@@ -179,6 +179,16 @@ export async function GET(request: NextRequest) {
           .update({ stock: Math.max(0, product.stock - 1) })
           .eq("id", order.product_id);
       }
+    }
+  }
+
+  // Trừ lượt mã giảm giá (idempotent theo order_id; mirror trừ kho).
+  if (order.discount_code) {
+    const { error: finErr } = await supabase.rpc("finalize_discount_redemption", {
+      p_order_id: order.id,
+    });
+    if (finErr) {
+      console.error("VNPAY IPN: finalize_discount_redemption failed:", finErr);
     }
   }
 
