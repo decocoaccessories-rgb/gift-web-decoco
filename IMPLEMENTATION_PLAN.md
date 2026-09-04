@@ -20,6 +20,12 @@
   - `finalize_discount_redemption` trên đơn đã redeem → no-op, `usage_count` giữ nguyên.
 - Không sửa logic VNPAY IPN / SePay webhook về đối soát tiền — chỉ thêm gọi `finalize_discount_redemption`; số tiền QR/URL build bằng `finalPrice` để giữ khớp.
 
+### Cập nhật sau review (2026-09-04): cho popup hiện ở `/dat-hang`
+- Bỏ `/dat-hang` khỏi `SUPPRESSED_PATHS` (giữ chặn `/thanh-toan`, `/cam-on`). Lý do: exit popup ở bước thanh toán chuyển đổi cao nhất; khách bấm Back trên mobile ở `/dat-hang` sẽ thấy popup ngay thay vì rời trang.
+- CTA khi đang ở `/dat-hang`: `dispatchEvent('decoco:apply-discount')` thay vì `router.push` (tránh soft-nav không kích hoạt lại prefill). Form checkout lắng nghe event và áp mã tại chỗ.
+- Khi mã đã áp vào đơn → ghi `sessionStorage['decoco_discount_code']` để popup tự tắt (không mời lại mã trùng).
+- `npm run build` lại: pass.
+
 ---
 
 ## Giai đoạn 1 — Database (Supabase)
@@ -107,11 +113,11 @@
 ### 4.1. Exit-Intent Popup
 - [x] `components/marketing/ExitIntentOffer.tsx` (client):
   - [x] Props: `{ enabled: boolean, code: string, title: string, body: string, cta: string, expiresAt?: string | null }`.
-  - [x] Guard hiển thị: `localStorage['decoco_exit_offer_v1']` (TTL 7 ngày), `sessionStorage['decoco_exit_offer_shown']`, `sessionStorage['decoco_discount_code']` trống, `usePathname()` không thuộc `/dat-hang|/thanh-toan|/cam-on`.
+  - [x] Guard hiển thị: `localStorage['decoco_exit_offer_v1']` (TTL 7 ngày), `sessionStorage['decoco_exit_offer_shown']`, `sessionStorage['decoco_discount_code']` trống, `usePathname()` không thuộc `/thanh-toan|/cam-on` (**cho hiện ở `/dat-hang`**).
   - [x] Desktop trigger: `matchMedia('(pointer:fine)')` → sau 3s add `mouseout` listener (`!relatedTarget && clientY<=0`).
   - [x] Mobile trigger: sau 3s `history.pushState` 1 lần + `popstate` → mở popup.
   - [x] UI: overlay + card, tiêu đề/body, chip mã (click copy + toast), nút CTA, nút X. (Đếm ngược nếu `expiresAt` — tùy chọn, có thể để V-next.)
-  - [x] CTA: set `sessionStorage['decoco_discount_code']`, set `localStorage` TTL, `router.push('/dat-hang?code=' + code)`.
+  - [x] CTA: set `sessionStorage['decoco_discount_code']`, set `localStorage` TTL; nếu đang ở `/dat-hang` → `dispatchEvent('decoco:apply-discount')`, ngược lại `router.push('/dat-hang?code=' + code)`.
   - [x] Đóng (X/ESC/overlay): set `localStorage` TTL + `sessionStorage['decoco_exit_offer_shown']='1'`.
   - [x] A11y: `role="dialog" aria-modal`, focus CTA, bẫy Tab, ESC, khoá scroll body khi mở.
 - [x] `components/marketing/ExitIntentOfferGate.tsx` (server) — đọc `site_content` (`exit_offer_*`) + mã (`discount_codes` lấy `expires_at` của `exit_offer_code`), render `<ExitIntentOffer .../>` hoặc `null`.
@@ -127,7 +133,9 @@
 - [x] Order summary: thêm `Tạm tính`, `Giảm giá ({code})` (khi có), `Tổng` = `applied?.final_amount ?? productPrice`.
 - [x] `onSubmit`: body thêm `discount_code: applied?.code`. Xử lý `res.status === 422 && data.discount_error` → set `discountError`, clear `applied`.
 - [x] Nhãn nút submit + text tổng dùng `final_amount` khi đã áp.
-- [x] `<Suspense>` bọc phần dùng `useSearchParams` nếu Next 16 yêu cầu (kiểm tra khi build).
+- [x] Đọc `?code=` bằng `window.location.search` (không dùng `useSearchParams` → khỏi cần `<Suspense>`).
+- [x] Lắng nghe event `decoco:apply-discount` (popup hiện ngay trên `/dat-hang`) → `applyDiscount(code)` không reload.
+- [x] Khi `discountApplied` truthy → ghi `sessionStorage['decoco_discount_code']` để popup không làm phiền tiếp.
 
 ---
 

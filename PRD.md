@@ -25,7 +25,7 @@
 | **Phát hiện ý định thoát (desktop)** | Nghe `mouseout`/`mouseleave` khi con trỏ rời mép trên viewport (`clientY <= 0`, `relatedTarget == null`). Chỉ "vũ trang" sau khi khách ở lại trang ≥ 3 giây. |
 | **Mobile / cảm ứng** | Không có `mouseleave`. Dùng tín hiệu thay thế: chặn **nút Back** (history trap) hoặc **cuộn ngược nhanh về đầu trang**. V3 làm: desktop = mouseleave; mobile = back-button trap (1 lần/phiên). |
 | **Tần suất / chống phiền** | Sau khi khách đóng hoặc đã bấm nhận → **không hiện lại trong 7 ngày** (lưu `localStorage`). Không hiện quá 1 lần/phiên. |
-| **Không hiện ở đâu** | `/dat-hang`, `/thanh-toan/*`, `/cam-on`, toàn bộ `/admin/*`; và khi đơn đã có mã giảm giá đang áp. |
+| **Không hiện ở đâu** | `/thanh-toan/*`, `/cam-on`, toàn bộ `/admin/*`; và khi đơn đã có mã giảm giá đang áp (`sessionStorage['decoco_discount_code']`). **Vẫn hiện ở `/dat-hang`** — exit-intent lúc rời trang thanh toán chuyển đổi cao nhất; nếu đang ở `/dat-hang`, CTA không điều hướng mà bắn event `decoco:apply-discount` để form tự áp mã. |
 | **Số trường form** | 1–3 trường chuyển đổi tốt nhất; ≥ 4 trường tụt mạnh. → Popup DECOCO **không thu thập email**, chỉ 1 nút CTA "Dùng mã & đặt hàng". |
 | **Khẩn cấp** | Cho phép hiển thị hạn dùng mã ("Hết hạn sau 48 giờ") nếu mã có `expires_at`. |
 | **Accessibility** | `role="dialog"` + `aria-modal`, bẫy focus, phím **ESC** đóng, click nền đóng, nút X góc trên phải, tương phản đủ. |
@@ -184,7 +184,7 @@ Hành vi:
 - **Điều kiện hiển thị** (tất cả phải đúng):
   - `localStorage['decoco_exit_offer_v1']` trống hoặc đã quá 7 ngày.
   - Chưa hiện trong phiên (`sessionStorage['decoco_exit_offer_shown']` trống).
-  - Route hiện tại không thuộc `{/dat-hang, /thanh-toan, /cam-on}` (và component không tồn tại ở /admin).
+  - Route hiện tại không thuộc `{/thanh-toan, /cam-on}` (và component không tồn tại ở /admin). Ở `/dat-hang` vẫn cho hiện.
   - `sessionStorage['decoco_discount_code']` trống.
 - **Trigger**:
   - Desktop (`matchMedia('(pointer:fine)')`): sau 3s, `document.addEventListener('mouseout')` → nếu `!e.relatedTarget && e.clientY <= 0` → mở popup.
@@ -193,7 +193,8 @@ Hành vi:
 - **CTA click**:
   - `sessionStorage['decoco_discount_code'] = code`.
   - `localStorage['decoco_exit_offer_v1'] = Date.now()` (đóng băng 7 ngày).
-  - `router.push('/dat-hang?code=' + encodeURIComponent(code))`.
+  - Nếu **đang ở `/dat-hang`**: `window.dispatchEvent(new CustomEvent('decoco:apply-discount', { detail: code }))` (form checkout lắng nghe và tự áp, không reload).
+  - Ngược lại: `router.push('/dat-hang?code=' + encodeURIComponent(code))`.
 - **Đóng (X / ESC / click nền)**: set `localStorage['decoco_exit_offer_v1'] = Date.now()` + `sessionStorage['decoco_exit_offer_shown'] = '1'`.
 - **A11y**: `role="dialog" aria-modal="true"`, focus vào nút CTA khi mở, bẫy Tab, ESC đóng, overlay click đóng, khoá scroll nền khi mở.
 

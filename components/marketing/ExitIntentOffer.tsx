@@ -18,7 +18,10 @@ const SS_SHOWN = "decoco_exit_offer_shown";
 const SS_CODE = "decoco_discount_code";
 const SUPPRESS_MS = 7 * 24 * 60 * 60 * 1000; // 7 ngày
 const ARM_DELAY_MS = 3000;
-const SUPPRESSED_PATHS = ["/dat-hang", "/thanh-toan", "/cam-on"];
+// Cho phép popup ở /dat-hang (exit-intent lúc rời trang thanh toán chuyển đổi cao).
+// Vẫn chặn ở trang QR và trang cảm ơn (sau khi đã đặt/thanh toán).
+const SUPPRESSED_PATHS = ["/thanh-toan", "/cam-on"];
+const APPLY_EVENT = "decoco:apply-discount";
 
 function safeGet(storage: Storage | undefined, key: string): string | null {
   try {
@@ -61,8 +64,13 @@ export default function ExitIntentOffer({ code, title, body, cta }: Props) {
     safeSet(window.sessionStorage, SS_CODE, code);
     safeSet(window.localStorage, LS_KEY, String(Date.now()));
     setOpen(false);
-    router.push(`/dat-hang?code=${encodeURIComponent(code)}`);
-  }, [code, router]);
+    if (pathname?.startsWith("/dat-hang")) {
+      // Đã ở trang thanh toán — không điều hướng, chỉ báo cho form áp mã.
+      window.dispatchEvent(new CustomEvent(APPLY_EVENT, { detail: code }));
+    } else {
+      router.push(`/dat-hang?code=${encodeURIComponent(code)}`);
+    }
+  }, [code, router, pathname]);
 
   // Arm triggers once per session, after a short delay, when not suppressed.
   useEffect(() => {

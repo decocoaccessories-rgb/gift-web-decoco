@@ -165,6 +165,29 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [designInfo]);
 
+  // Popup exit-intent hiện ngay trên trang này → áp mã mà không điều hướng.
+  useEffect(() => {
+    function onApply(e: Event) {
+      const code = (e as CustomEvent<string>).detail;
+      if (code) {
+        setDiscountInput(code);
+        applyDiscount(code);
+      }
+    }
+    window.addEventListener("decoco:apply-discount", onApply);
+    return () => window.removeEventListener("decoco:apply-discount", onApply);
+  }, [applyDiscount]);
+
+  // Khi đã có mã áp vào đơn, đánh dấu để popup không làm phiền nữa.
+  useEffect(() => {
+    if (!discountApplied) return;
+    try {
+      sessionStorage.setItem("decoco_discount_code", discountApplied.code);
+    } catch {
+      /* ignore */
+    }
+  }, [discountApplied]);
+
   async function onSubmit(values: FormValues) {
     if (!designInfo) {
       setServerError("Không tìm thấy thông tin thiết kế. Vui lòng quay lại chọn sản phẩm.");
