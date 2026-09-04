@@ -190,13 +190,15 @@ Hành vi:
   - `useEffect` phụ thuộc `[suppressed, pathname]` → **vũ trang lại mỗi khi đổi trang**; cleanup gỡ listener + clear timer của trang trước.
   - Desktop (`matchMedia('(pointer:fine)')`): sau 3s, `document.addEventListener('mouseout')` → nếu `!e.relatedTarget && e.clientY <= 0` → mở popup.
   - Mobile: sau 3s, `history.pushState(null,'',location.href)` (dummy = URL trang hiện tại) + listener `popstate` → cú Back đầu chỉ gỡ dummy (không rời trang) → mở popup. Đóng popup rồi bấm Back tiếp → rời trang bình thường.
+  - **Lưu ý quan trọng**: `popstate` cũng bắn khi khách bấm 1 link cùng trang có `#hash` (same-document navigation, vd nút "Bắt đầu thiết kế ngay" trỏ `href="#design-tool"`) — không phải ý định rời trang. Listener phải so `window.location.href === trapUrl` (URL lúc đặt bẫy) trước khi `trigger()`, nếu không popup sẽ bung sai lúc khách bấm các link/anchor cùng trang.
   - Sau khi popup đã hiện (`sessionStorage['decoco_exit_offer_shown']`) → không đặt bẫy ở các trang sau nữa (tránh chèn thừa nấc lịch sử).
 - **Nội dung**: tiêu đề, body, mã (hiển thị dạng chip copy được), (tùy chọn) dòng đếm ngược nếu mã có `expires_at`, nút CTA, nút X.
 - **CTA click**:
   - `sessionStorage['decoco_discount_code'] = code`.
   - `localStorage['decoco_exit_offer_v1'] = Date.now()` (đóng băng 7 ngày).
   - Nếu **đang ở `/dat-hang`**: `window.dispatchEvent(new CustomEvent('decoco:apply-discount', { detail: code }))` (form checkout lắng nghe và tự áp, không reload).
-  - Ngược lại: `router.push('/dat-hang?code=' + encodeURIComponent(code))`.
+  - Ngược lại, nếu `sessionStorage['decoco_design']` **đã có** (khách đã hoàn tất thiết kế): `router.push('/dat-hang?code=' + encodeURIComponent(code))`.
+  - Ngược lại (chưa chọn/thiết kế sản phẩm nào — vd đang xem trang chủ hoặc mới xem trang chi tiết sản phẩm): **không điều hướng** — `/dat-hang` chưa có `designInfo` sẽ chỉ ra trang trống. Chỉ báo `toast.success(...)`; mã vẫn nằm trong `sessionStorage['decoco_discount_code']` và tự áp khi khách hoàn tất thiết kế rồi vào `/dat-hang` qua luồng thường (`DesignToolCanvas.tsx` → `router.push("/dat-hang")`).
 - **Đóng (X / ESC / click nền)**: set `localStorage['decoco_exit_offer_v1'] = Date.now()` + `sessionStorage['decoco_exit_offer_shown'] = '1'`.
 - **A11y**: `role="dialog" aria-modal="true"`, focus vào nút CTA khi mở, bẫy Tab, ESC đóng, overlay click đóng, khoá scroll nền khi mở.
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { X } from "lucide-react";
+import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -64,11 +65,22 @@ export default function ExitIntentOffer({ code, title, body, cta }: Props) {
     safeSet(window.sessionStorage, SS_CODE, code);
     safeSet(window.localStorage, LS_KEY, String(Date.now()));
     setOpen(false);
+
     if (pathname?.startsWith("/dat-hang")) {
       // Đã ở trang thanh toán — không điều hướng, chỉ báo cho form áp mã.
       window.dispatchEvent(new CustomEvent(APPLY_EVENT, { detail: code }));
-    } else {
+      return;
+    }
+
+    // /dat-hang cần sessionStorage['decoco_design'] (được set bởi công cụ thiết
+    // kế) để biết sản phẩm + giá. Chưa có thì đừng đẩy khách tới đó — sẽ gặp
+    // trang trống "Chưa có thông tin thiết kế" và mã không áp được. Giữ mã lại,
+    // nó tự động áp khi khách hoàn tất thiết kế và vào /dat-hang qua luồng thường.
+    const hasDesign = !!safeGet(window.sessionStorage, "decoco_design");
+    if (hasDesign) {
       router.push(`/dat-hang?code=${encodeURIComponent(code)}`);
+    } else {
+      toast.success(`Đã lưu mã ${code} — tự động áp khi bạn hoàn tất thiết kế và đặt hàng.`);
     }
   }, [code, router, pathname]);
 
@@ -103,8 +115,15 @@ export default function ExitIntentOffer({ code, title, body, cta }: Props) {
         disarm = () => document.removeEventListener("mouseout", onMouseOut);
       } else {
         // Mobile: chèn 1 nấc lịch sử giả = ĐÚNG URL trang hiện tại.
-        history.pushState(null, "", window.location.href);
-        const onPopState = () => trigger();
+        const trapUrl = window.location.href;
+        history.pushState(null, "", trapUrl);
+        const onPopState = () => {
+          // `popstate` cũng bắn khi khách bấm 1 link cùng trang có "#hash" (vd
+          // nút "Bắt đầu thiết kế ngay" trỏ "#design-tool") — đó là điều hướng
+          // TIẾN, không phải ý định rời trang. Chỉ coi là bấm Back thật khi URL
+          // đã quay đúng về URL lúc đặt bẫy (không thêm/đổi hash hay path).
+          if (window.location.href === trapUrl) trigger();
+        };
         window.addEventListener("popstate", onPopState);
         disarm = () => window.removeEventListener("popstate", onPopState);
       }

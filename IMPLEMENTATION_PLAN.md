@@ -31,6 +31,20 @@
 - Nhờ vậy nấc lịch sử giả luôn trỏ **đúng URL trang khách đang đứng** → bấm Back ở `/dat-hang` mở popup **ngay tại `/dat-hang`**, không client-nav về trang trước.
 - Trade-off nhỏ: nếu khách qua nhiều trang mà chưa bung popup, mỗi trang để lại 1 nấc lịch sử giả (tối đa vài nấc, dừng hẳn sau khi popup hiện 1 lần/phiên). Chấp nhận được.
 - `npm run build`: pass.
+- **Verify trên production (Chrome automation)**: patch `matchMedia`/`history.pushState` để buộc nhánh mobile trên browser desktop, xác nhận đúng 1 lệnh push của Next (điều hướng) + 1 lệnh push của bẫy (~3s sau) + bấm Back → URL không đổi, popup hiện đúng như thiết kế. Xem chi tiết ở cuối file.
+
+### Bug thật phát hiện qua test tay trên mobile (2026-09-04, báo bởi user) — ĐÃ SỬA
+Người dùng test trên điện thoại thật: ở trang chi tiết sản phẩm, bấm nút **"Bắt đầu thiết kế ngay"** (`<a href="#design-tool">` — neo tới section cùng trang) thì **popup tự bung ra**, và khi bấm CTA của popup thì bị đưa sang `/dat-hang` nhưng **mã không tự điền vào ô**.
+
+**Nguyên nhân gốc (2 lỗi riêng biệt):**
+1. **`popstate` false-positive**: theo HTML spec, điều hướng tới fragment cùng trang (`href="#hash"`) — dù là điều hướng TIẾN — cũng bắn ra sự kiện `popstate` (kèm `hashchange`), không chỉ khi bấm Back. Listener cũ gọi `trigger()` bất cứ khi nào có `popstate`, nên bắt luôn cả cú bấm nút thiết kế làm hiện popup nhầm.
+2. **CTA đẩy khách tới `/dat-hang` khi chưa có `designInfo`**: nếu khách bấm "Dùng mã & đặt hàng" trước khi hoàn tất thiết kế (chưa có `sessionStorage['decoco_design']`, được set bởi `DesignToolCanvas.tsx` khi xuất thiết kế), trang `/dat-hang` không có sản phẩm/giá để validate mã → ô mã đứng im, trang hiện "Chưa có thông tin thiết kế" — trông như mã bị mất.
+
+**Fix (`components/marketing/ExitIntentOffer.tsx`):**
+- [x] Ghi nhớ `trapUrl` (URL lúc đặt bẫy). Trong `onPopState`, chỉ gọi `trigger()` khi `window.location.href === trapUrl` — loại các `popstate` giả từ điều hướng TIẾN cùng trang (hash/anchor), chỉ còn giữ đúng trường hợp bấm Back thật (URL quay lại đúng chỗ đã bẫy).
+- [x] `accept()`: chỉ `router.push('/dat-hang?code=...')` khi `sessionStorage['decoco_design']` đã tồn tại. Chưa có thì giữ mã trong `sessionStorage['decoco_discount_code']` (không điều hướng) + `toast.success(...)` báo đã lưu mã — mã tự áp khi khách hoàn tất thiết kế và vào `/dat-hang` qua luồng thường.
+- [x] `npm run build`: pass. Offline test suites re-run: pass (không đụng logic đã test).
+- [x] Verify lại trên production: dựng lại kịch bản THẬT của bug (trang sản phẩm, đợi vũ trang, bấm anchor `#hash`) — xác nhận `popstate` bắn nhưng KHÔNG còn mở popup vì `location.href !== trapUrl`; bấm CTA khi chưa có `decoco_design` → toast hiện, không điều hướng, mã vẫn trong sessionStorage.
 
 ---
 
