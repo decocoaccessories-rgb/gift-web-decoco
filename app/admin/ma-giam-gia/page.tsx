@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { AlertTriangle, Plus, RefreshCw, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { formatPrice } from "@/lib/utils";
 import type { DiscountCode } from "@/lib/supabase/types";
 import DiscountEditDialog from "./DiscountEditDialog";
@@ -24,6 +25,35 @@ export default function AdminDiscountsPage() {
   const [editing, setEditing] = useState<DiscountCode | null | undefined>(undefined);
   const [toDelete, setToDelete] = useState<DiscountCode | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Mã được popup exit-intent quảng bá. Lưu ở site_content (key `exit_offer_code`),
+  // KHÔNG phải trong discount_codes — nên phải chọn tường minh ở đây, nếu không
+  // popup sẽ tiếp tục in mã cũ sau khi admin đổi mã.
+  const [popupCode, setPopupCode] = useState("");
+  const [savingPopup, setSavingPopup] = useState(false);
+
+  const fetchPopupCode = useCallback(async () => {
+    const res = await fetch("/api/admin/site-content");
+    if (!res.ok) return;
+    const rows = (await res.json()) as Array<{ key: string; value: string | null }>;
+    setPopupCode(rows.find((r) => r.key === "exit_offer_code")?.value ?? "");
+  }, []);
+
+  async function savePopupCode(value: string) {
+    setPopupCode(value);
+    setSavingPopup(true);
+    const res = await fetch("/api/admin/site-content", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates: [{ key: "exit_offer_code", value }] }),
+    });
+    setSavingPopup(false);
+    if (res.ok) {
+      toast.success(value ? `Popup sẽ hiện mã ${value}` : "Đã tắt mã trên popup");
+    } else {
+      toast.error("Không lưu được mã popup");
+      fetchPopupCode();
+    }
+  }
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -35,7 +65,8 @@ export default function AdminDiscountsPage() {
 
   useEffect(() => {
     fetchItems();
-  }, [fetchItems]);
+    fetchPopupCode();
+  }, [fetchItems, fetchPopupCode]);
 
   async function toggleActive(d: DiscountCode) {
     const res = await fetch(`/api/admin/discounts/${d.id}`, {
@@ -84,6 +115,38 @@ export default function AdminDiscountsPage() {
             Tạo mã
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-1.5">
+        <Label htmlFor="popup_code">Mã hiển thị trên popup rời trang</Label>
+        <div className="flex items-center gap-2">
+          <select
+            id="popup_code"
+            value={popupCode}
+            disabled={savingPopup || loading}
+            onChange={(e) => savePopupCode(e.target.value)}
+            className="flex h-8 w-full max-w-xs rounded-lg border border-input bg-background px-2.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60"
+          >
+            <option value="">— Không hiện popup —</option>
+            {items
+              .filter((d) => d.is_active)
+              .map((d) => (
+                <option key={d.id} value={d.code}>
+                  {d.code}
+                </option>
+              ))}
+            {popupCode && !items.some((d) => d.is_active && d.code === popupCode) && (
+              <option value={popupCode}>{popupCode} (không còn hiệu lực)</option>
+            )}
+          </select>
+          {savingPopup && (
+            <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Popup ưu đãi khi khách rời trang sẽ quảng bá mã này. Nếu mã bị tắt hoặc hết hạn,
+          popup tự động không hiện.
+        </p>
       </div>
 
       <div className="rounded-xl border border-border overflow-hidden">

@@ -33,6 +33,32 @@ export function computeDiscountAmount(
   return amount < 0 ? 0 : amount;
 }
 
+/** Các cột cần để quyết định một mã có đáng quảng bá trên popup hay không. */
+export interface OfferableCode {
+  is_active: boolean;
+  starts_at: string | null;
+  expires_at: string | null;
+  usage_limit: number | null;
+  usage_count: number;
+}
+
+/**
+ * Mã có đáng đưa lên popup exit-intent không?
+ * Chỉ xét các điều kiện độc lập với giỏ hàng — bỏ qua `min_order_amount` và
+ * `per_customer_limit` vì lúc popup hiện chưa biết đơn hàng lẫn khách là ai.
+ */
+export function isCodeOfferable(
+  code: OfferableCode | null | undefined,
+  now: number = Date.now()
+): boolean {
+  if (!code) return false;
+  if (!code.is_active) return false;
+  if (code.starts_at && new Date(code.starts_at).getTime() > now) return false;
+  if (code.expires_at && new Date(code.expires_at).getTime() < now) return false;
+  if (code.usage_limit != null && code.usage_count >= code.usage_limit) return false;
+  return true;
+}
+
 /** Lý do từ chối (từ RPC) → câu tiếng Việt cho khách. */
 export function discountReasonMessage(reason: string): string {
   switch (reason) {
