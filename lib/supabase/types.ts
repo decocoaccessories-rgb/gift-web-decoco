@@ -96,6 +96,13 @@ export interface Database {
           payment_status: PaymentStatus;
           vnp_txn_ref: string | null;
           vnp_transaction_no: string | null;
+          utm_source: string | null;
+          utm_medium: string | null;
+          utm_campaign: string | null;
+          utm_term: string | null;
+          utm_content: string | null;
+          referrer: string | null;
+          landing_page: string | null;
           vietqr_content: string | null;
           vietqr_qr_url: string | null;
           vietqr_expires_at: string | null;

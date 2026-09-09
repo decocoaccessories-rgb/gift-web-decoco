@@ -35,6 +35,11 @@ export type NewOrderEmailInput = {
     | "design_image_url"
     | "payment_method"
     | "payment_status"
+    | "utm_source"
+    | "utm_medium"
+    | "utm_campaign"
+    | "utm_content"
+    | "referrer"
     | "created_at"
   >;
   product?: Pick<Product, "name"> | null;

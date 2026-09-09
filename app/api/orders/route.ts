@@ -47,6 +47,19 @@ const orderSchema = z.object({
   province: z.string().min(1),
   address: z.string().min(10),
   note: z.string().max(500).optional(),
+  // Nguồn marketing first-touch do client gửi lên (localStorage). Tất cả optional.
+  attribution: z
+    .object({
+      utm_source: z.string().max(200),
+      utm_medium: z.string().max(200),
+      utm_campaign: z.string().max(200),
+      utm_term: z.string().max(200),
+      utm_content: z.string().max(200),
+      referrer: z.string().max(500),
+      landing_page: z.string().max(500),
+    })
+    .partial()
+    .optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -220,9 +233,16 @@ export async function POST(request: NextRequest) {
       payment_method: data.payment_method,
       payment_status: "pending",
       vnp_txn_ref: txnRef,
+      utm_source: data.attribution?.utm_source ?? null,
+      utm_medium: data.attribution?.utm_medium ?? null,
+      utm_campaign: data.attribution?.utm_campaign ?? null,
+      utm_term: data.attribution?.utm_term ?? null,
+      utm_content: data.attribution?.utm_content ?? null,
+      referrer: data.attribution?.referrer ?? null,
+      landing_page: data.attribution?.landing_page ?? null,
       ...vietqrColumns,
     })
-    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, discount_code, discount_amount, province, address, note, price_at_order, variant_name, design_image_url, payment_method, payment_status, created_at")
+    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, discount_code, discount_amount, province, address, note, price_at_order, variant_name, design_image_url, payment_method, payment_status, utm_source, utm_medium, utm_campaign, utm_term, utm_content, referrer, landing_page, created_at")
     .single();
 
   if (insertError || !order) {
@@ -352,7 +372,7 @@ export async function GET(request: NextRequest) {
   const admin = createAdminClient();
   let query = admin
     .from("orders")
-    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, discount_code, discount_amount, province, address, note, status, price_at_order, design_image_url, variant_name, payment_method, payment_status, paid_at, created_at, product_id", { count: "exact" })
+    .select("id, order_number, customer_name, customer_phone, customer_email, recipient_name, recipient_phone, discount_code, discount_amount, province, address, note, status, price_at_order, design_image_url, variant_name, payment_method, payment_status, paid_at, utm_source, utm_medium, utm_campaign, utm_term, utm_content, referrer, landing_page, created_at, product_id", { count: "exact" })
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

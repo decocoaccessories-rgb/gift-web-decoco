@@ -147,10 +147,20 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
             />
           )}
 
-          {/* CTA */}
+          {/* CTA — cuộn bằng JS thay vì điều hướng anchor. Trình duyệt in-app
+              của TikTok chặn mọi cú bấm <a> có href đổi URL (kể cả chỉ thêm
+              #fragment) bằng màn "Mở liên kết này trong trình duyệt của bạn",
+              làm khách văng sang trình duyệt ngoài và mất phân loại đã chọn.
+              scrollIntoView không phát sinh điều hướng nên IAB không chặn. */}
           {!outOfStock && (
             <a
               href="#design-tool"
+              onClick={(e) => {
+                e.preventDefault();
+                document
+                  .getElementById("design-tool")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
               className="inline-flex items-center justify-center h-10 px-6 rounded-lg bg-primary text-primary-foreground text-sm font-medium transition-all hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Bắt đầu thiết kế ngay

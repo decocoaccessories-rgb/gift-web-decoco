@@ -49,6 +49,13 @@ type OrderRow = Pick<
   | "payment_method"
   | "payment_status"
   | "paid_at"
+  | "utm_source"
+  | "utm_medium"
+  | "utm_campaign"
+  | "utm_term"
+  | "utm_content"
+  | "referrer"
+  | "landing_page"
   | "created_at"
 >;
 

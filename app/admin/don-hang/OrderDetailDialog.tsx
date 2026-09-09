@@ -27,6 +27,13 @@ type OrderRow = Pick<
   | "payment_method"
   | "payment_status"
   | "paid_at"
+  | "utm_source"
+  | "utm_medium"
+  | "utm_campaign"
+  | "utm_term"
+  | "utm_content"
+  | "referrer"
+  | "landing_page"
   | "created_at"
 >;
 
@@ -209,6 +216,62 @@ export default function OrderDetailDialog({ order, onClose }: Props) {
               </dd>
             </dl>
           </div>
+
+          {/* Nguồn marketing (first-touch) — chỉ hiện khi có dữ liệu */}
+          {(order.utm_source ||
+            order.utm_medium ||
+            order.utm_campaign ||
+            order.referrer) && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Nguồn đơn · marketing
+              </p>
+              <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-sm">
+                {order.utm_source && (
+                  <>
+                    <dt className="text-muted-foreground">Source</dt>
+                    <dd className="font-medium">{order.utm_source}</dd>
+                  </>
+                )}
+                {order.utm_medium && (
+                  <>
+                    <dt className="text-muted-foreground">Medium</dt>
+                    <dd>{order.utm_medium}</dd>
+                  </>
+                )}
+                {order.utm_campaign && (
+                  <>
+                    <dt className="text-muted-foreground">Campaign</dt>
+                    <dd>{order.utm_campaign}</dd>
+                  </>
+                )}
+                {order.utm_content && (
+                  <>
+                    <dt className="text-muted-foreground">Content</dt>
+                    <dd>{order.utm_content}</dd>
+                  </>
+                )}
+                {order.utm_term && (
+                  <>
+                    <dt className="text-muted-foreground">Term</dt>
+                    <dd>{order.utm_term}</dd>
+                  </>
+                )}
+                {order.referrer && (
+                  <>
+                    <dt className="text-muted-foreground">Referrer</dt>
+                    <dd className="break-all">{order.referrer}</dd>
+                  </>
+                )}
+                {order.landing_page && (
+                  <>
+                    <dt className="text-muted-foreground">Landing</dt>
+                    <dd className="break-all">{order.landing_page}</dd>
+                  </>
+                )}
+              </dl>
+            </div>
+          )}
         </div>
       </div>
     </div>

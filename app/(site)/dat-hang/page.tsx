@@ -17,6 +17,7 @@ import {
   trackBeginCheckout,
   trackPurchase,
 } from "@/lib/analytics/gtm";
+import { getAttribution } from "@/lib/analytics/attribution";
 
 const schema = z.object({
   customer_name: z.string().min(2, "Vui lòng nhập họ tên người đặt (tối thiểu 2 ký tự)"),
@@ -211,6 +212,10 @@ export default function CheckoutPage() {
     setSubmitting(true);
     setServerError("");
 
+    // Nguồn marketing first-touch (utm_* / referrer) đã lưu ở localStorage khi
+    // khách vào site — đính kèm để đơn có "nguồn" đáng tin, không phụ thuộc phiên GA4.
+    const attribution = getAttribution() ?? undefined;
+
     try {
       const res = await fetch("/api/orders", {
         method: "POST",
@@ -225,6 +230,7 @@ export default function CheckoutPage() {
           variant_name: designInfo.variantName ?? null,
           payment_method: paymentMethod,
           discount_code: discountApplied?.code ?? undefined,
+          attribution,
           ...values,
         }),
       });

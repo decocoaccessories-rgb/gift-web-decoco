@@ -21,6 +21,11 @@ export interface NewOrderEmailData {
     | "design_image_url"
     | "payment_method"
     | "payment_status"
+    | "utm_source"
+    | "utm_medium"
+    | "utm_campaign"
+    | "utm_content"
+    | "referrer"
     | "created_at"
   >;
   productName: string | null;
@@ -102,6 +107,24 @@ export function renderNewOrderEmail(data: NewOrderEmailData): {
         }
         ${row("Phương thức TT", escape(PAYMENT_METHOD_LABEL[order.payment_method] ?? order.payment_method))}
         ${row("TT trạng thái", escape(PAYMENT_STATUS_LABEL[order.payment_status] ?? order.payment_status))}
+        ${
+          order.utm_source || order.referrer
+            ? row(
+                "Nguồn đơn",
+                escape(
+                  [
+                    order.utm_source,
+                    order.utm_medium,
+                    order.utm_campaign ? `“${order.utm_campaign}”` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" / ") ||
+                    order.referrer ||
+                    ""
+                )
+              )
+            : ""
+        }
         ${order.design_image_url ? row("Ảnh thiết kế", `<a href="${escape(order.design_image_url)}" style="color:#7a1f3a;">Tải ảnh</a>`) : ""}
       </tbody>
     </table>
