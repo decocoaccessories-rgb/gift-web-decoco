@@ -6,6 +6,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn, formatPrice } from "@/lib/utils";
 import { nextPollDelay } from "@/lib/vietqr-poll";
+import { flushPendingPurchase } from "@/lib/analytics/gtm";
 import { Loader2, CheckCircle, Clock, Copy, Check } from "lucide-react";
 
 interface VietqrStatus {
@@ -63,6 +64,8 @@ export default function VietqrPaymentPage({
       if (!active) return;
 
       if (data && data !== "notfound" && data.paymentStatus === "paid") {
+        // Tiền đã về — giờ mới tính là chuyển đổi trong GA4.
+        flushPendingPurchase(orderId);
         router.push(
           `/cam-on?id=${orderId}&num=${encodeURIComponent(data.orderNumber)}&pay=success`
         );

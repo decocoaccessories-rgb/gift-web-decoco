@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import FallbackImage from "@/components/ui/FallbackImage";
 import ImageSlider from "@/components/ui/ImageSlider";
 import DesignTool from "@/components/DesignTool/DesignTool";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
 import type { Frame, Product, ProductVariant } from "@/lib/supabase/types";
+import { trackViewItem } from "@/lib/analytics/gtm";
 
 interface Props {
   product: Pick<
@@ -30,6 +31,15 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
   const hasVariants = variants.length > 0;
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [variantClickTrigger, setVariantClickTrigger] = useState(0);
+
+  // GA4 view_item — bắn một lần cho mỗi sản phẩm khách mở xem.
+  useEffect(() => {
+    trackViewItem({
+      item_id: product.id,
+      item_name: product.name,
+      price: product.price,
+    });
+  }, [product.id, product.name, product.price]);
 
   const handleVariantSelect = (variantId: string) => {
     setSelectedVariantId(variantId);

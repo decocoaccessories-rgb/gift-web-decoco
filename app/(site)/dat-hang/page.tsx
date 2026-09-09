@@ -12,6 +12,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatPrice } from "@/lib/utils";
 import provinces from "@/public/data/provinces.json";
+import {
+  stashPendingPurchase,
+  trackBeginCheckout,
+  trackPurchase,
+} from "@/lib/analytics/gtm";
 
 const schema = z.object({
   customer_name: z.string().min(2, "Vui lòng nhập họ tên người đặt (tối thiểu 2 ký tự)"),
@@ -92,7 +97,16 @@ export default function CheckoutPage() {
   useEffect(() => {
     try {
       const raw = sessionStorage.getItem("decoco_design");
-      if (raw) setDesignInfo(JSON.parse(raw));
+      if (!raw) return;
+      const parsed: DesignInfo = JSON.parse(raw);
+      setDesignInfo(parsed);
+      // GA4 begin_checkout — khách đã có thiết kế và đang ở bước điền thông tin.
+      trackBeginCheckout({
+        item_id: parsed.productId,
+        item_name: parsed.productName,
+        item_variant: parsed.variantName,
+        price: parsed.productPrice,
+      });
     } catch {
       // sessionStorage unavailable
     }
@@ -235,6 +249,27 @@ export default function CheckoutPage() {
         sessionStorage.removeItem("decoco_discount_code");
       } catch {
         /* ignore */
+      }
+
+      // GA4 purchase. Đơn COD tính là chuyển đổi ngay khi đặt; đơn cần chuyển
+      // khoản thì cất lại, chờ trang /thanh-toan xác nhận SePay đã nhận tiền —
+      // để đơn bỏ dở không thổi phồng doanh thu trong báo cáo.
+      const purchasePayload = {
+        transactionId: String(data.orderNumber ?? data.orderId),
+        value: orderTotal,
+        coupon: discountApplied?.code,
+        paymentMethod,
+        item: {
+          item_id: designInfo.productId,
+          item_name: designInfo.productName,
+          item_variant: designInfo.variantName,
+          price: designInfo.productPrice,
+        },
+      };
+      if (data.vietqr) {
+        stashPendingPurchase(String(data.orderId), purchasePayload);
+      } else {
+        trackPurchase(purchasePayload);
       }
 
       if (data.paymentUrl) {
