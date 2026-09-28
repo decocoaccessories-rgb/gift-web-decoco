@@ -57,5 +57,17 @@ npm.cmd run build -> exit 0; Compiled successfully; 37/37 static pages generated
 ```
 
 - Lần build đầu trong sandbox **thất bại do không kết nối được `fonts.googleapis.com`**. Chạy lại với quyền mạng đã pass. Kiểm tra API Supabase từ terminal sandbox cũng báo `Unable to connect to the remote server`, vì vậy chưa thể dùng kết quả đó để kết luận project còn hay hết restriction.
-- Kiểm tra lại bằng kết nối mạng ngày 28/09/2026: `GET /rest/v1/products?select=slug&limit=1 -> HTTP 200`, trả về một slug sản phẩm. Project hiện đã phục hồi truy vấn đọc; vẫn cần kiểm tra Storage và trang web sau deploy.
-- **Production:** chờ push/deploy và xác minh sau triển khai; chỉ được đánh dấu hoàn tất khi kiểm tra HTTP/ảnh/dữ liệu thật đạt yêu cầu.
+- Kiểm tra lại bằng kết nối mạng ngày 28/09/2026: `GET /rest/v1/products?select=slug&limit=1 -> HTTP 200`, trả về một slug sản phẩm. Project đã phục hồi truy vấn đọc; kết quả Storage và trang web sau deploy ghi dưới đây.
+- **Thành công (production sau deploy commit `f17a2b6`):**
+
+```text
+GET /                         -> HTTP 200; không có fallback sản phẩm/đánh giá; có /media/products/
+GET /san-pham                 -> HTTP 200; không có fallback sản phẩm; có /media/products/
+GET /san-pham/<slug>          -> HTTP 200; có công cụ thiết kế và /media/products/
+GET /media/products/1788762943877.png -> HTTP 200, image/png, 1,746,231 byte
+Lần đầu qua Vercel CDN       -> x-vercel-cache: MISS
+Hai lần truy cập tiếp theo    -> x-vercel-cache: HIT
+Cache-Control                 -> public, max-age=31536000, immutable
+```
+
+Ảnh gốc trên Supabase cũng trả HTTP 200. Không cần `supabase db push` hoặc deploy Edge Function vì bản sửa không có migration hay thay đổi Supabase; đẩy code GitHub đã kích hoạt Vercel. Cần theo dõi Usage → Cached Egress trong kỳ tới để đánh giá mức tiết kiệm thực tế. Trạng thái vẫn là **ĐANG SỬA CHỮA** theo yêu cầu; chưa có số liệu đủ dài để xác nhận hạn mức 5 GB/tháng sẽ luôn được giữ.
