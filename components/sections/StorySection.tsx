@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 const DEFAULT_TEXT_1 =
   "DECOCO ra đời năm 2019 tại Hà Nội với một sứ mệnh đơn giản: biến từng món quà thành một kỷ niệm không thể nào quên. Chúng tôi tin rằng trang sức đẹp nhất không phải là đắt nhất, mà là cái mang theo câu chuyện của bạn.";
@@ -34,7 +35,7 @@ export default function StorySection({ content }: StorySectionProps) {
           <div className="relative aspect-square rounded-2xl overflow-hidden bg-secondary/30">
             {storyImage ? (
               <Image
-                src={storyImage}
+                src={getCachedStorageUrl(storyImage)}
                 alt="DECOCO Story"
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"

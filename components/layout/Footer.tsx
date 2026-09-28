@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/server";
 
 const defaultContent: Record<string, string> = {
   footer_slogan: "Trang sức DECOCO —\nVẻ đẹp từ những điều nhỏ bé",
@@ -15,7 +15,7 @@ const defaultContent: Record<string, string> = {
 
 async function getSiteContent() {
   try {
-    const supabase = await createClient();
+    const supabase = createPublicClient();
     const { data } = await supabase
       .from("site_content")
       .select("key, value")

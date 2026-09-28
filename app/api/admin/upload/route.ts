@@ -43,7 +43,11 @@ export async function POST(request: NextRequest) {
   const arrayBuffer = await file.arrayBuffer();
   const { error: uploadError } = await adminSupabase.storage
     .from(bucket)
-    .upload(path, arrayBuffer, { contentType: file.type, upsert: true });
+    .upload(path, arrayBuffer, {
+      contentType: file.type,
+      cacheControl: "31536000",
+      upsert: true,
+    });
 
   if (uploadError) {
     console.error("Upload error:", uploadError);

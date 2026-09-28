@@ -8,7 +8,7 @@ import ProductsShowcaseSection from "@/components/sections/ProductsShowcaseSecti
 import FeedbackSection from "@/components/sections/FeedbackSection";
 import FaqSection from "@/components/sections/FaqSection";
 import CtaSection from "@/components/sections/CtaSection";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/server";
 import type { Product, FeedbackItem, FaqItem } from "@/lib/supabase/types";
 
 export default async function LandingPage() {
@@ -18,7 +18,7 @@ export default async function LandingPage() {
   let faqItems: Pick<FaqItem, "id" | "question" | "answer">[] = [];
 
   try {
-    const supabase = await createClient();
+    const supabase = createPublicClient();
     const [contentRes, productsRes, feedbackRes, faqRes] = await Promise.allSettled([
       supabase
         .from("site_content")

@@ -7,6 +7,7 @@ import "swiper/css";
 import "swiper/css/pagination";
 import "swiper/css/navigation";
 import type { FeedbackItem } from "@/lib/supabase/types";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 interface FeedbackCarouselProps {
   items: Pick<FeedbackItem, "id" | "image_url" | "alt_text">[];
@@ -36,7 +37,7 @@ export default function FeedbackCarousel({ items }: FeedbackCarouselProps) {
           <SwiperSlide key={item.id}>
             <div className="relative aspect-square overflow-hidden rounded-xl border border-border bg-secondary/20 shadow-sm">
               <Image
-                src={item.image_url}
+                src={getCachedStorageUrl(item.image_url)}
                 alt={item.alt_text ?? "Đánh giá của khách hàng"}
                 fill
                 sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"

@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/server";
 import ProductCard from "@/components/ui/ProductCard";
 import type { Product } from "@/lib/supabase/types";
 
@@ -14,7 +14,7 @@ async function getProducts(): Promise<
   Pick<Product, "slug" | "name" | "price" | "stock" | "images">[]
 > {
   try {
-    const supabase = await createClient();
+    const supabase = createPublicClient();
     const { data } = await supabase
       .from("products")
       .select("slug, name, price, stock, images")

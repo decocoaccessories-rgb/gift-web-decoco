@@ -3,6 +3,7 @@
 import Image, { type ImageProps } from "next/image";
 import { ImageOff } from "lucide-react";
 import { useEffect, useState } from "react";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 type FallbackImageProps = ImageProps & {
   /** Extra classes applied to the fallback placeholder container. */
@@ -44,7 +45,7 @@ export default function FallbackImage({
 
   return (
     <Image
-      src={src}
+      src={typeof src === "string" ? getCachedStorageUrl(src) : src}
       alt={alt}
       className={className}
       onError={(e) => {

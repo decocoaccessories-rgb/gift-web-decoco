@@ -28,6 +28,24 @@ export async function createClient() {
   );
 }
 
+/** Public, read-only client whose GET requests are cached by Next.js. */
+export function createPublicClient() {
+  return createSupabaseClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: {
+        fetch: (input, init) =>
+          fetch(input, {
+            ...init,
+            next: { revalidate: 300 },
+          }),
+      },
+    }
+  );
+}
+
 /** Use this client in API routes / Server Actions that need admin access (bypasses RLS) */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createAdminClient() {

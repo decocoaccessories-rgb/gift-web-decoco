@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
 import type { Product, Frame } from "@/lib/supabase/types";
 import ProductInteractive from "./ProductInteractive";
@@ -11,7 +11,7 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
   try {
-    const supabase = await createClient();
+    const supabase = createPublicClient();
     const { data } = await supabase
       .from("products")
       .select("name, description")
@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 async function getProduct(slug: string) {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("products")
     .select("id, name, slug, description, highlights, variants, price, stock, images, is_visible")
@@ -54,7 +54,7 @@ function parseHighlights(raw: string | null | undefined): string[] {
 }
 
 async function getFrames(productId: string) {
-  const supabase = await createClient();
+  const supabase = createPublicClient();
   const { data } = await supabase
     .from("frames")
     .select("id, name, thumbnail_url, config, sort_order")

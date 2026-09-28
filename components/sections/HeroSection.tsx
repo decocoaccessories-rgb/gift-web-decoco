@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 const DEFAULT_HEADLINE =
   "Tặng quà không chỉ là món đồ — tặng cả một kỷ niệm";
@@ -36,7 +37,7 @@ export default function HeroSection({ content }: HeroSectionProps) {
           <div className="absolute inset-0 -z-10">
             {mobileSrc && (
               <Image
-                src={mobileSrc}
+                src={getCachedStorageUrl(mobileSrc)}
                 alt="DECOCO Hero"
                 fill
                 priority
@@ -46,7 +47,7 @@ export default function HeroSection({ content }: HeroSectionProps) {
             )}
             {desktopSrc && (
               <Image
-                src={desktopSrc}
+                src={getCachedStorageUrl(desktopSrc)}
                 alt="DECOCO Hero"
                 fill
                 priority
