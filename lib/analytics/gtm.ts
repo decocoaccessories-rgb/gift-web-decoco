@@ -9,6 +9,7 @@
  * chỉ cần bật "Send Ecommerce data → Data Layer" là số liệu tự map sang GA4.
  */
 import { sendGTMEvent } from "@next/third-parties/google";
+import { ttqTrack } from "./tiktok";
 
 /** ID container GTM. Ghi đè được bằng env; để trống env sẽ tắt đo lường. */
 export const GTM_CONTAINER_ID =
@@ -59,6 +60,7 @@ export function trackBeginCheckout(item: GaItem): void {
     value: item.price ?? 0,
     items: [{ quantity: 1, ...item }],
   });
+  ttqTrack("InitiateCheckout", item, item.price ?? 0);
 }
 
 /**
@@ -99,6 +101,12 @@ export function trackPurchase(params: PurchasePayload): void {
       items: [{ quantity: 1, ...params.item }],
     },
     params.paymentMethod ? { payment_method: params.paymentMethod } : {}
+  );
+  ttqTrack(
+    "CompletePayment",
+    params.item,
+    params.value,
+    `purchase_${params.transactionId}`
   );
 }
 
