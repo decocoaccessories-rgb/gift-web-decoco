@@ -36,14 +36,29 @@ function toContents(item: GaItem) {
   ];
 }
 
+/** Chờ tối đa ~10s cho GTM nạp pixel khi sự kiện bắn ngay lúc tải trang. */
+const RETRY_MS = 300;
+const MAX_RETRIES = 33;
+
 export function ttqTrack(
   event: "InitiateCheckout" | "CompletePayment",
   item: GaItem,
   value: number,
-  eventId?: string
+  eventId?: string,
+  attempt = 0
 ): void {
+  if (typeof window === "undefined") return;
   const ttq = getTtq();
-  if (!ttq) return;
+  if (!ttq) {
+    // Tải thẳng /dat-hang thì useEffect chạy trước khi GTM kịp chạy thẻ pixel.
+    if (attempt < MAX_RETRIES) {
+      window.setTimeout(
+        () => ttqTrack(event, item, value, eventId, attempt + 1),
+        RETRY_MS
+      );
+    }
+    return;
+  }
   try {
     ttq.track(
       event,
