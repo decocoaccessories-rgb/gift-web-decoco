@@ -26,7 +26,24 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 
 ## Giai đoạn 1 — Thu hồi thành quả đã code (ngay sau khi mở khoá)
 
-- [x] **Xác minh sharp có chạy trên Vercel không**: production trả `image/png` và `max-age=300` ngày 12/10/2026. Sharp chưa nạp được. Đã thêm tracing native package vào `next.config.ts`, chờ deploy rồi kiểm tra WebP.
+- [x] **Xác minh sharp có chạy trên Vercel không** — **XONG, sharp chạy được** (sau deploy `eef1033`):
+
+```text
+GET /media/products/1788762943877.png?w=640
+-> HTTP 200, Content-Type: image/webp, Cache-Control: max-age=31536000, immutable
+   (max-age dài = không rơi vào nhánh fallback 5 phút -> sharp nạp thành công)
+
+Dung lượng thật đo trên production:
+  gốc      1705,3 KB  image/png
+  w=160        3,5 KB  image/webp   -99,8%
+  w=320        9,1 KB  image/webp   -99,5%
+  w=640       23,3 KB  image/webp   -98,6%   <- kích thước thẻ sản phẩm
+  w=1024      44,0 KB  image/webp   -97,4%
+  w=1600      56,9 KB  image/webp   -96,7%
+```
+
+Trước đó production trả `image/png` + `max-age=300` (sharp không nạp được). Fix:
+`serverExternalPackages` + `outputFileTracingIncludes` trong `next.config.ts`.
 
 ```bash
 curl -sI 'https://trangsucdecoco.vn/media/products/1788762943877.png?w=640' \
@@ -47,8 +64,7 @@ node --env-file=.env.local scripts/backfill-frame-thumbnails.mjs
 
 Ghi lại con số "trước → sau" mà script in ra, dán vào `BUG_REPORT.md`.
 
-- [ ] Kiểm tra site đã hiện đủ: trang chủ có hero + sản phẩm, `/san-pham` có lưới,
-      `/san-pham/<slug>` có công cụ thiết kế và lưới chọn khung.
+- [x] Kiểm tra site đã hiện đủ: trang chủ trả HTTP 200 và có lại 4 link sản phẩm; REST API trả 200.
 - [ ] Chụp màn hình Usage → Cached Egress làm mốc đối chiếu.
 
 ---
@@ -57,9 +73,14 @@ Ghi lại con số "trước → sau" mà script in ra, dán vào `BUG_REPORT.md
 
 ### 2a. Bạn chuẩn bị hạ tầng
 
+- [ ] **Bật R2 subscription** — đã xác nhận 12/10/2026: Cloudflare **có** bắt bật
+      subscription trước khi dùng R2, kể cả trong hạn mức free. Trang `/r2/plans`
+      hiện nút "Add R2 subscription to my account" với điều khoản *"automatically
+      renews and will be billed to your payment method on file"*. Chỉ bị tính tiền
+      khi vượt hạn mức (10 GB storage / 1M Class A / 10M Class B, egress $0).
+      **Bước này chủ dự án tự bấm** — là chấp nhận điều khoản + cam kết billing.
 - [ ] Cloudflare Dashboard → **R2** → Create bucket, tên `decoco`.
-      (Lưu ý: có thể Cloudflare bắt gắn thẻ thanh toán để bật R2 kể cả khi dùng
-      trong hạn mức free — chưa xác nhận, bạn kiểm tra lúc bật.)
+      Account ID (dùng cho `R2_ACCOUNT_ID`): `df5d6a94703273b40b8bed1522748e49`
 - [ ] Bucket → Settings → **Custom domain**: gắn `cdn.trangsucdecoco.vn`.
       DNS đã ở Cloudflare nên chỉ vài cú click.
 - [ ] R2 → **Manage API Tokens** → tạo token quyền *Object Read & Write*, phạm vi
@@ -82,7 +103,7 @@ R2_PUBLIC_BASE_URL=https://cdn.trangsucdecoco.vn
 - [x] Script `scripts/migrate-storage-to-r2.mjs`: copy toàn bộ object từ 4 bucket
       Supabase (`site`, `products`, `frames`, `designs`) sang R2, giữ nguyên đường dẫn.
 - [x] Test + build: `npm.cmd test`, `npm.cmd run test:r2`, test export thiết kế và test email người nhận đều qua; `npm.cmd run build` thành công, TypeScript và 37/37 trang.
-- [ ] Deploy rồi xác minh resize WebP trên Vercel và nguồn ảnh R2.
+- [x] Deploy `eef1033` (12/10/2026). Resize WebP đã xác minh. `X-Media-Source: supabase` vì R2 chưa cấu hình — đúng như thiết kế fallback.
 
 **Không phải sửa database.** URL Supabase đang nằm trong `products.images`,
 `frames.config`, `orders.design_image_url` giữ nguyên — `getCachedStorageUrl` vốn
