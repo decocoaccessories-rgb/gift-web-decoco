@@ -366,6 +366,75 @@ Tới đây **mọi điểm hiển thị ảnh Supabase đều đi qua `/media` 
 
 ---
 
+## Sự cố do chính bản sửa gây ra — `/media` trả 500 (12/10/2026)
+
+Deploy `4192094` làm **mọi request `/media/*` trả HTTP 500** trên production.
+
+Chẩn đoán: `/media/products/nope.png` (không có `?w=`, đường dẫn không tồn tại, không chạm code resize) **cũng** 500, trong khi `/san-pham` chạy bình thường → lỗi ở mức **nạp module**, không phải logic. Runtime Vercel không nạp được native binary của sharp, mà `import sharp` ở đầu file thì kéo sập cả route.
+
+Lỗi lộ ra đúng lúc này vì deploy xoá cache CDN, khiến function thực sự chạy lần đầu kể từ 06/10.
+
+**Sửa** (`68adb7a`):
+- `await import("sharp")` trong nhánh resize, không import ở đầu route.
+- Bỏ `import sharp` khỏi đầu `lib/images/frame-thumbnail.ts` — route upload import hằng số từ module này nên import tĩnh vẫn kéo sharp vào lúc nạp module.
+- sharp không nạp được → phục vụ ảnh gốc với cache **5 phút** (không phải 1 năm), để CDN không giữ bản gốc suốt một năm dưới cache key `?w=` sau khi sửa xong.
+- Bỏ lần fetch upstream thứ hai ở nhánh fallback — buffer đã có sẵn.
+- Thêm assert `doesNotMatch(/^import sharp from/m)` chặn hồi quy.
+
+Xác nhận sau deploy:
+
+```text
+GET /media/products/1788762943877.png        -> HTTP 402, Cache-Control: no-store   (hết 500)
+GET /media/products/1788762943877.png?w=640  -> HTTP 402, Cache-Control: no-store
+```
+
+402 là Supabase trả về, route chỉ passthrough và **không cache lỗi** — đúng thiết kế.
+
+**Bài học**: thêm native dependency vào đường phục vụ ảnh mà chỉ kiểm thử bằng mock trên Windows là không đủ. Test đã pass toàn bộ trong khi production sập.
+
+## Cached Egress đã triệt để chưa — trả lời thẳng
+
+**Chưa chứng minh được.** Cơ chế đúng và đã chặn nguồn đốt chính, nhưng còn một khoản chưa xử lý.
+
+Công thức egress Supabase sau bản sửa:
+
+```
+egress ≈ (số lần CDN MISS) × (dung lượng ảnh gốc)
+```
+
+Không còn phụ thuộc lượng truy cập — chỉ phụ thuộc số lần cache miss.
+
+| Nguồn | Trạng thái |
+| --- | --- |
+| Lượt xem lặp lại (phần lớn traffic) | **Đã xử lý** — CDN hấp thụ, Supabase 0 byte |
+| Ảnh khung full-size trong lưới chọn | Code xong, **chờ backfill** |
+| MISS sau mỗi lần deploy | **Chưa xử lý** |
+
+### Bằng chứng: mỗi lần deploy xoá sạch cache
+
+Đo trực tiếp quanh deploy sáng 12/10 trên cùng một URL:
+
+```text
+Trước deploy: Age: 446325 (5,2 ngày), x-vercel-cache: HIT
+Sau  deploy: Age: 0,                 x-vercel-cache: MISS
+```
+
+Tức sau mỗi lần deploy, **toàn bộ ảnh phải kéo lại từ Supabase**. Ước lượng thô ~50 ảnh × 1,7 MB × vài POP ≈ vài trăm MB mỗi deploy. Chu kỳ vừa rồi có 8 lần deploy — riêng khoản đó đã có thể chạm 5 GB. Phần `?w=` còn **làm tăng** số MISS vì mỗi chiều rộng là một cache key riêng.
+
+Cách giảm: gộp nhiều thay đổi vào một lần deploy thay vì đẩy từng commit nhỏ. Sau backfill, ảnh khung kéo lại chỉ còn vài chục KB nên chi phí mỗi deploy nhẹ đi đáng kể.
+
+### Còn phải xác minh khi Supabase sống lại
+
+1. **sharp có chạy trên Vercel không** — hiện chưa biết, vì mọi upstream đều 402:
+   ```bash
+   curl -sI 'https://trangsucdecoco.vn/media/products/<file>.png?w=640' | grep -i 'content-type\|cache-control'
+   ```
+   `image/webp` → sharp OK. `image/png` + `max-age=300` → sharp không nạp được, resize coi như chưa có (ảnh vẫn hiển thị, chỉ không nhỏ đi).
+2. Chạy backfill thumbnail khung.
+3. Theo dõi Usage → Cached Egress hết một chu kỳ rồi mới kết luận được.
+
+---
+
 ## Phụ lục — fix vòng 1 (28/09/2026), giữ để tham chiếu
 
 - Đã áp dụng: `app/media/[...path]/route.ts`, `lib/supabase/storage-url.ts`, `lib/supabase/server.ts` (`createPublicClient` cache 5 phút), các điểm đọc public và upload ảnh admin.
