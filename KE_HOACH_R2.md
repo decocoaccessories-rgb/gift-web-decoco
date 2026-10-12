@@ -73,19 +73,26 @@ Ghi lại con số "trước → sau" mà script in ra, dán vào `BUG_REPORT.md
 
 ### 2a. Bạn chuẩn bị hạ tầng
 
-- [ ] **Bật R2 subscription** — đã xác nhận 12/10/2026: Cloudflare **có** bắt bật
+- [x] **Bật R2 subscription** — chủ dự án đã bật 12/10/2026. Usage $0.00, chu kỳ 12/10–12/11.
+      (mô tả gốc) — đã xác nhận 12/10/2026: Cloudflare **có** bắt bật
       subscription trước khi dùng R2, kể cả trong hạn mức free. Trang `/r2/plans`
       hiện nút "Add R2 subscription to my account" với điều khoản *"automatically
       renews and will be billed to your payment method on file"*. Chỉ bị tính tiền
       khi vượt hạn mức (10 GB storage / 1M Class A / 10M Class B, egress $0).
       **Bước này chủ dự án tự bấm** — là chấp nhận điều khoản + cam kết billing.
-- [ ] Cloudflare Dashboard → **R2** → Create bucket, tên `decoco`.
+- [x] Bucket `decoco` đã tạo 12/10/2026, location **Asia-Pacific (APAC)**.
       Account ID (dùng cho `R2_ACCOUNT_ID`): `df5d6a94703273b40b8bed1522748e49`
-- [ ] Bucket → Settings → **Custom domain**: gắn `cdn.trangsucdecoco.vn`.
-      DNS đã ở Cloudflare nên chỉ vài cú click.
-- [ ] R2 → **Manage API Tokens** → tạo token quyền *Object Read & Write*, phạm vi
-      đúng bucket `decoco`. Lưu lại Access Key ID + Secret.
-- [ ] Thêm env vào `.env.local` **và** Vercel (Production + Preview):
+- [x] Custom domain `cdn.trangsucdecoco.vn` đã gắn (CNAME `cdn` → `decoco`).
+      Đã xác minh: `GET https://cdn.trangsucdecoco.vn/products/1788762943877.png`
+      -> HTTP 200, 1.746.231 byte, image/png.
+- [x] Token `decoco-web-storage` (Account API Token), quyền **Object Read & Write**,
+      phạm vi đúng bucket `decoco`. Đã ghi vào `.env.local`.
+- [x] `.env.local`: đủ 6 biến.
+- [ ] **Vercel: mới có 3/5 biến bắt buộc** — còn thiếu `R2_ACCESS_KEY_ID` và
+      `R2_SECRET_ACCESS_KEY` (chủ dự án tự nhập, type **Secret**, Production + Preview).
+      ⚠️ **KHÔNG deploy cho tới khi đủ 5 biến**: `isR2Configured()` ném lỗi khi có
+      một phần cấu hình, làm `/api/admin/upload` và `/api/design/export` trả 500 —
+      cái sau nằm trong luồng đặt hàng của khách.
 
 ```
 R2_ACCOUNT_ID=
@@ -113,8 +120,10 @@ chuyện nội bộ của nó.
 ### 2c. Chạy di chuyển
 
 - [x] `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --dry-run`: 417 object, 310,59 MiB ngày 12/10/2026; chỉ đọc danh sách, không tải ảnh.
-- [ ] `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs`
-- [ ] Đối chiếu số object R2 với Supabase: chạy `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --verify-only`. Báo cáo từng bucket nằm trong `.vercel/r2-migration-verify.json`; phải có `failed=0` và `verified=sourceObjects`.
+- [x] Copy thật xong 12/10/2026: **418/418 object, 0 lỗi** (site 25, products 196,
+      frames 47, designs 150). Số object R2 khớp nguồn từng bucket.
+- [x] `--verify-only` chạy độc lập: **418/418 verified, 0 lỗi**.
+- [ ] (cũ) Đối chiếu số object R2 với Supabase: chạy `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --verify-only`. Báo cáo từng bucket nằm trong `.vercel/r2-migration-verify.json`; phải có `failed=0` và `verified=sourceObjects`.
 - [ ] Duyệt lại site: trang chủ, danh mục, chi tiết, công cụ thiết kế, admin —
       xác nhận ảnh hiện đủ.
 
