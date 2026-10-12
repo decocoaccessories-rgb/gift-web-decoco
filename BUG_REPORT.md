@@ -322,9 +322,47 @@ Test gọi thẳng handler `GET` của route với upstream giả: ảnh 2000×2
 - **Egress Supabase**: gần như không đổi. Mỗi chiều rộng là một cache key riêng nên lần MISS đầu tiên bị nhân lên theo số width; bù lại toàn bộ lượt xem lặp lại vẫn 0 byte Supabase như sau phần 1.
 - **Chưa đo được trên production**: project vẫn bị restriction, phải chờ Supabase phục hồi rồi mới `curl` được để lấy số thật.
 
-### Còn lại ngoài phạm vi
+### Phần 3b — Hero, Story, Feedback
 
-Hero, StorySection và FeedbackCarousel vẫn phục vụ ảnh gốc. Giờ chỉ là thêm một `cdnWidth` cho mỗi chỗ, nhưng chưa làm trong lần này.
+Ba điểm còn lại dùng thẳng `next/image` (không qua `FallbackImage`) nên gọi `getResizedStorageUrl()` trực tiếp:
+
+| Điểm hiển thị | Kích thước thật | `w` |
+| --- | --- | --- |
+| Hero desktop (`hidden md:block`, 100vw) | full-bleed | 1600 |
+| Hero mobile (`md:hidden`, ≤768px) | full-bleed | 1024 |
+| `StorySection` (ô vuông 50vw trong `max-w-5xl`) | ~512px | 1024 |
+| `FeedbackCarousel` (thẻ vuông, 3 cột) | ~400px | 640 |
+
+Hero là ảnh LCP nên để bản desktop ở mức cao nhất (1600); bản mobile hạ xuống 1024 — đây là nhóm khách tốn data nhất, và ảnh nằm dưới lớp phủ `bg-black/50` có chữ đè lên nên không nhìn ra khác biệt.
+
+Rà lại thì còn 3 điểm nữa cũng chưa khai báo kích thước, làm nốt cùng đợt:
+
+| Điểm hiển thị | Kích thước thật | `w` |
+| --- | --- | --- |
+| `dat-hang` preview thiết kế (sidebar) | ~300px | 640 |
+| Admin chi tiết đơn, ảnh thiết kế (`w-48`) | ~192px | 640 |
+| Admin nội dung, ô feedback | ~250px | 320 |
+
+Link "tải ảnh thiết kế" trong chi tiết đơn **vẫn trỏ ảnh gốc** — admin cần bản đầy đủ để in.
+
+Files: `HeroSection.tsx`, `StorySection.tsx`, `FeedbackCarousel.tsx`, `dat-hang/page.tsx`, `OrderDetailDialog.tsx`, `admin/noi-dung/page.tsx`.
+
+### Hai chỗ cố tình KHÔNG thu nhỏ
+
+| Chỗ | Lý do |
+| --- | --- |
+| `DesignToolCanvas` — `FabricImage.fromURL(config.backgroundImage)` | Canvas dựng file in thật; ảnh thu nhỏ sẽ làm hỏng chất lượng in |
+| `FramePanel` / admin khung — `thumbnail_url` | Bản thân nó đã là WebP 400px sau phần 2, không cần `?w=` nữa |
+
+Test có assert `doesNotMatch(/getResizedStorageUrl/)` cho `DesignToolCanvas` để sau này không ai "tối ưu" nhầm chỗ này.
+
+```text
+npm.cmd test -> exit 0 (18 PASS)
+npx.cmd tsc --noEmit -> exit 0
+npm.cmd run build    -> exit 0, Compiled successfully in 31.6s, 37/37 static pages
+```
+
+Tới đây **mọi điểm hiển thị ảnh Supabase đều đi qua `/media` và xin đúng kích thước hiển thị**, trừ hai ngoại lệ cố ý ở bảng trên.
 
 ---
 

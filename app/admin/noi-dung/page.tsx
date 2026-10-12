@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { RefreshCw, Save, Plus, Trash2, Loader2 } from "lucide-react";
 import type { SiteContent, FaqItem, FeedbackItem } from "@/lib/supabase/types";
 import ImageUploadField from "@/components/admin/ImageUploadField";
-import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
+import { getResizedStorageUrl } from "@/lib/supabase/storage-url";
 
 const SECTION_LABELS: Record<string, string> = {
   hero: "Hero (Banner chính)",
@@ -427,7 +427,7 @@ export default function AdminNoiDungPage() {
                   <div key={item.id} className="border border-border rounded-lg p-4 space-y-3">
                     <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-muted/20">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={getCachedStorageUrl(draft.image_url)} alt={draft.alt_text || "Feedback"} className="w-full h-full object-cover" />
+                      <img src={getResizedStorageUrl(draft.image_url, 320)} alt={draft.alt_text || "Feedback"} className="w-full h-full object-cover" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs">Mô tả (alt text)</Label>

@@ -117,14 +117,39 @@ const sized = [
   ["app/admin/san-pham/page.tsx", /getResizedStorageUrl\(img, 160\)/],
   ["app/admin/san-pham/ProductEditDialog.tsx", /cdnWidth=\{320\}/],
   ["components/admin/ImageUploadField.tsx", /cdnWidth=\{640\}/],
+  // Hero là ảnh LCP: bản mobile nhỏ hơn bản desktop để tiết kiệm data.
+  ["components/sections/HeroSection.tsx", /getResizedStorageUrl\(mobileSrc, 1024\)/],
+  ["components/sections/HeroSection.tsx", /getResizedStorageUrl\(desktopSrc, 1600\)/],
+  ["components/sections/StorySection.tsx", /getResizedStorageUrl\(storyImage, 1024\)/],
+  ["components/ui/FeedbackCarousel.tsx", /getResizedStorageUrl\(item\.image_url, 640\)/],
+  ["app/(site)/dat-hang/page.tsx", /getResizedStorageUrl\(designInfo\.designImageUrl, 640\)/],
+  ["app/admin/don-hang/OrderDetailDialog.tsx", /getResizedStorageUrl\(order\.design_image_url, 640\)/],
+  ["app/admin/noi-dung/page.tsx", /getResizedStorageUrl\(draft\.image_url, 320\)/],
 ];
 for (const [file, pattern] of sized) {
   const source = await readFile(new URL(`../${file}`, import.meta.url), "utf8");
   assert.match(source, pattern, `${file} must request a display-sized image`);
 }
 
+// 4. Canvas thiết kế PHẢI nạp ảnh nền gốc — bản thu nhỏ sẽ làm hỏng chất lượng in.
+const canvasSource = await readFile(
+  new URL("../components/DesignTool/DesignToolCanvas.tsx", import.meta.url),
+  "utf8"
+);
+assert.match(
+  canvasSource,
+  /FabricImage\.fromURL\(getCachedStorageUrl\(config\.backgroundImage\)/,
+  "the design canvas must keep loading the full-resolution background"
+);
+assert.doesNotMatch(
+  canvasSource,
+  /getResizedStorageUrl/,
+  "the design canvas must never request a downscaled background"
+);
+
 console.log(`PASS: /media?w= resizes to WebP; widths whitelisted to ${MEDIA_WIDTHS.join(", ")}.`);
 console.log("PASS: no ?w= keeps the original passthrough; GIFs are never re-encoded.");
 console.log("PASS: small images are not enlarged.");
 console.log("PASS: an unknown width is rejected before any Supabase request.");
-console.log("PASS: every product image render site asks for a display-sized render.");
+console.log("PASS: every display render site asks for a display-sized image.");
+console.log("PASS: the design canvas still loads the full-resolution background.");
