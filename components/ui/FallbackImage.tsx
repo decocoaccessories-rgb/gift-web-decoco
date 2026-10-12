@@ -3,11 +3,21 @@
 import Image, { type ImageProps } from "next/image";
 import { ImageOff } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
+import {
+  getCachedStorageUrl,
+  getResizedStorageUrl,
+  type MediaWidth,
+} from "@/lib/supabase/storage-url";
 
 type FallbackImageProps = ImageProps & {
   /** Extra classes applied to the fallback placeholder container. */
   fallbackClassName?: string;
+  /**
+   * Chiều rộng thật sự cần hiển thị. `images.unoptimized: true` khiến `sizes`
+   * bị bỏ qua và trình duyệt tải ảnh gốc vài MB, nên truyền giá trị này để
+   * `/media` phục vụ bản đã thu nhỏ.
+   */
+  cdnWidth?: MediaWidth;
 };
 
 /**
@@ -20,6 +30,7 @@ export default function FallbackImage({
   alt,
   className,
   fallbackClassName,
+  cdnWidth,
   onError,
   ...rest
 }: FallbackImageProps) {
@@ -45,7 +56,13 @@ export default function FallbackImage({
 
   return (
     <Image
-      src={typeof src === "string" ? getCachedStorageUrl(src) : src}
+      src={
+        typeof src !== "string"
+          ? src
+          : cdnWidth
+            ? getResizedStorageUrl(src, cdnWidth)
+            : getCachedStorageUrl(src)
+      }
       alt={alt}
       className={className}
       onError={(e) => {

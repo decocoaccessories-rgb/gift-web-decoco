@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-cached-egress-fix.mjs && node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-design-tool-media-cache.mjs && node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-frame-thumbnail.mjs && node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-product-image-resize.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

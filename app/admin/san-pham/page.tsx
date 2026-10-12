@@ -10,7 +10,7 @@ import { formatPrice } from "@/lib/utils";
 import { RefreshCw, Eye, EyeOff, Plus } from "lucide-react";
 import type { Product } from "@/lib/supabase/types";
 import ProductEditDialog from "./ProductEditDialog";
-import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
+import { getResizedStorageUrl } from "@/lib/supabase/storage-url";
 
 type ProductRow = Pick<
   Product,
@@ -135,7 +135,7 @@ export default function AdminProductsPage() {
                         <div className="flex items-center gap-3">
                           <div className="relative h-10 w-10 rounded-md overflow-hidden bg-secondary/30 shrink-0">
                             {img ? (
-                              <Image src={getCachedStorageUrl(img)} alt={product.name} fill sizes="40px" className="object-cover" />
+                              <Image src={getResizedStorageUrl(img, 160)} alt={product.name} fill sizes="40px" className="object-cover" />
                             ) : (
                               <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/30 font-heading italic">D</div>
                             )}

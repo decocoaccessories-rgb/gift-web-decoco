@@ -272,7 +272,7 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
                   <div key={v.id} className="flex items-center gap-2">
                     <div className="relative h-10 w-10 rounded-md overflow-hidden border border-border bg-secondary/20 shrink-0">
                       {v.image_url ? (
-                        <FallbackImage src={v.image_url} alt={v.name || `Phân loại ${i + 1}`} fill sizes="40px" className="object-cover" />
+                        <FallbackImage src={v.image_url} alt={v.name || `Phân loại ${i + 1}`} cdnWidth={160} fill sizes="40px" className="object-cover" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">—</div>
                       )}
@@ -340,6 +340,7 @@ export default function ProductEditDialog({ product, onClose, onSaved }: Props) 
                       <FallbackImage
                         src={url}
                         alt={`Ảnh ${i + 1}`}
+                        cdnWidth={320}
                         fill
                         sizes="100px"
                         className="object-cover"

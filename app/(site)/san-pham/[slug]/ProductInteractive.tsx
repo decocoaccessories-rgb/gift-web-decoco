@@ -129,7 +129,7 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
                       }`}
                     >
                       <span className="relative h-7 w-7 rounded-md overflow-hidden bg-secondary/20 shrink-0">
-                        <FallbackImage src={v.image_url} alt={v.name} fill sizes="28px" className="object-cover" />
+                        <FallbackImage src={v.image_url} alt={v.name} cdnWidth={160} fill sizes="28px" className="object-cover" />
                       </span>
                       <span>{v.name}</span>
                     </button>

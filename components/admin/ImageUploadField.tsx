@@ -80,7 +80,7 @@ export default function ImageUploadField({
       {value && (
         <div className="relative w-full max-w-sm rounded-lg overflow-hidden border border-border bg-muted/20">
           <div className="relative aspect-video">
-            <FallbackImage src={value} alt="Preview" fill className="object-cover" sizes="400px" />
+            <FallbackImage src={value} alt="Preview" cdnWidth={640} fill className="object-cover" sizes="400px" />
           </div>
           <button
             type="button"

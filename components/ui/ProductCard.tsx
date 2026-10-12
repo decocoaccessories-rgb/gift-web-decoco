@@ -64,6 +64,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             <FallbackImage
               src={primaryImage}
               alt={product.name}
+              cdnWidth={640}
               fill
               sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
               className={`object-cover transition-opacity duration-500 group-hover:opacity-0 ${showSecond ? "opacity-0" : ""}`}
@@ -72,6 +73,7 @@ export default function ProductCard({ product }: ProductCardProps) {
               <FallbackImage
                 src={hoverImage}
                 alt={`${product.name} - alternate`}
+                cdnWidth={640}
                 fill
                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                 className={`object-cover opacity-0 transition-opacity duration-500 group-hover:opacity-100 ${showSecond ? "opacity-100" : ""}`}

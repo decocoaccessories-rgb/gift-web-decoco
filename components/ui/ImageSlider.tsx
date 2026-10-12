@@ -52,6 +52,7 @@ export default function ImageSlider({ images, alt, variantClickTrigger }: ImageS
               <FallbackImage
                 src={src}
                 alt={`${alt} - ${i + 1}`}
+                cdnWidth={1024}
                 fill
                 sizes="(max-width: 768px) 100vw, 50vw"
                 className="object-cover"
@@ -79,6 +80,7 @@ export default function ImageSlider({ images, alt, variantClickTrigger }: ImageS
                 <FallbackImage
                   src={src}
                   alt={`${alt} thumbnail ${i + 1}`}
+                  cdnWidth={160}
                   fill
                   sizes="80px"
                   className="object-cover"

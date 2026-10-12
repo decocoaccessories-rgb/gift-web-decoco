@@ -37,8 +37,8 @@ for (const [file] of guardedSources) {
   const source = await readFile(new URL(`../${file}`, import.meta.url), "utf8");
   assert.match(
     source,
-    /getCachedStorageUrl/,
-    `${file} renders Supabase Storage images and must import/use getCachedStorageUrl`
+    /getCachedStorageUrl|getResizedStorageUrl/,
+    `${file} renders Supabase Storage images and must route them through /media`
   );
 }
 

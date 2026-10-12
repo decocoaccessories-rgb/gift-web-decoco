@@ -232,9 +232,99 @@ node --env-file=.env.local scripts/backfill-frame-thumbnails.mjs            # th
 
 Script in ra dung lượng trước/sau từng khung và tổng mức giảm — đó mới là con số thật cần ghi lại vào báo cáo này.
 
+---
+
+## Phần 3 — Ảnh sản phẩm phục vụ đúng kích thước hiển thị (12/10/2026)
+
+### Đính chính phần 2
+
+Mục "Còn lại ngoài phạm vi" của phần 2 gọi ảnh sản phẩm là "nguồn egress lớn thứ hai sau khung". **Nói vậy không chính xác** — cần phân biệt hai loại chi phí:
+
+| | Lượt xem lặp lại | Lần MISS đầu (mỗi region/deploy) |
+| --- | --- | --- |
+| Trước phần 1 | Supabase trả ảnh gốc **mỗi lượt** | — |
+| Sau phần 1 | Vercel CDN trả, Supabase **0 byte** | Supabase trả ảnh gốc 1 lần |
+
+Nghĩa là egress Supabase của ảnh sản phẩm **đã được phần 1 xử lý**. Cái còn lại là **dung lượng trang** của khách: mỗi thẻ sản phẩm vẫn tải PNG gốc ~1,7 MB để hiển thị ở ~300px. Đó là chi phí băng thông Vercel + tốc độ tải trang, không phải cached egress Supabase. Phần 3 giải quyết đúng vấn đề đó.
+
+### Thiết kế
+
+`/media` nhận thêm tham số `?w=`, tự resize bằng sharp rồi để Vercel CDN cache bản nhỏ 1 năm:
+
+```
+/media/products/123.png          -> ảnh gốc (hành vi cũ, không đổi)
+/media/products/123.png?w=640    -> WebP 640px, cache 1 năm
+                                    MISS: kéo ảnh gốc 1 lần rồi resize
+                                    HIT : 0 byte Supabase, ~vài chục KB tới khách
+```
+
+Chiều rộng bị **khoá trong danh sách đóng** `160 / 320 / 640 / 1024 / 1600`. `w` lạ bị trả 400 `no-store` **trước khi** gọi Supabase — nếu không, bất kỳ ai cũng có thể gọi `?w=1..9999` để vừa sinh vô số cache key vừa ép Supabase trả ảnh gốc mỗi lần.
+
+Vì ảnh sản phẩm đều đi qua `FallbackImage`, chỉ cần thêm prop `cdnWidth` ở một chỗ:
+
+| Điểm hiển thị | Kích thước thật | `cdnWidth` |
+| --- | --- | --- |
+| `ProductCard` (lưới trang chủ + `/san-pham`) | ~300–400px | 640 |
+| `ImageSlider` ảnh chính | ~50vw | 1024 |
+| `ImageSlider` thumbnail | 80px | 160 |
+| Swatch phân loại | 28px | 160 |
+| Admin bảng sản phẩm | 40px | 160 |
+| Admin lưới ảnh trong dialog | 100px | 320 |
+| `ImageUploadField` preview | 400px | 640 |
+
+Fail-soft: sharp lỗi → phục vụ ảnh gốc. GIF **không** đi qua sharp để giữ animation. Ảnh nhỏ hơn mức yêu cầu không bị phóng to.
+
+### Files Changed
+
+| File | Thay đổi |
+| --- | --- |
+| `app/media/[...path]/route.ts` | Thêm `?w=` có whitelist + resize WebP, fail-soft, GIF passthrough |
+| `lib/supabase/storage-url.ts` | Thêm `MEDIA_WIDTHS`, `isMediaWidth()`, `getResizedStorageUrl()` |
+| `components/ui/FallbackImage.tsx` | Thêm prop `cdnWidth` |
+| `ProductCard` / `ImageSlider` / `ProductInteractive` | Khai báo `cdnWidth` theo bảng trên |
+| `app/admin/san-pham/page.tsx`, `ProductEditDialog.tsx`, `ImageUploadField.tsx` | Như trên |
+| `scripts/alias-hook.mjs` | **Mới** — cho Node thuần resolve alias `@/` khi chạy test |
+| `scripts/test-product-image-resize.mjs` | **Mới** — test |
+| `package.json` | Thêm `npm test` chạy cả 4 script |
+
+### Test Results — **Thành công**
+
+```text
+npm.cmd test
+PASS: Supabase images are routed through the site CDN cache.
+PASS: CDN/browser cache TTL is one year for immutable image paths.
+PASS: New Supabase uploads use a one-year browser cache TTL.
+PASS: Upstream errors and non-image responses are not cached.
+PASS: Frame thumbnails are served through the site CDN cache.
+PASS: The fabric canvas loads frame backgrounds through the site CDN cache.
+PASS: Checkout and admin image previews are served through the site CDN cache.
+PASS: No render path hard-codes a Supabase Storage URL.
+PASS: Frame thumbnails are WebP 400px, aspect ratio preserved.
+PASS: ảnh mẫu 1772x1535 PNG 7463 KB -> 12 KB (-99.8%); 1772px -> 400px là ~1/20 số pixel.
+PASS: Small images are not enlarged; thumbnails never overwrite the original.
+PASS: Upload route generates thumbnails fail-soft; admin saves the thumbnail URL.
+PASS: /media?w= resizes to WebP; widths whitelisted to 160, 320, 640, 1024, 1600.
+PASS: no ?w= keeps the original passthrough; GIFs are never re-encoded.
+PASS: small images are not enlarged.
+PASS: an unknown width is rejected before any Supabase request.
+PASS: every product image render site asks for a display-sized render.
+test exit=0
+
+npx.cmd tsc --noEmit  -> exit 0
+npm.cmd run build     -> exit 0, Compiled successfully in 34.9s, 37/37 static pages
+```
+
+Test gọi thẳng handler `GET` của route với upstream giả: ảnh 2000×2000 + `?w=640` trả về WebP đúng 640px; `?w=641/0/-200/99999/abc/640.5` đều 400 `no-store` và **không phát sinh request Supabase nào**.
+
+### Tác động thực tế
+
+- **Dung lượng trang**: giảm mạnh, đây là lợi ích chính. Trang chủ trước đây tải N × ~1,7 MB PNG để hiển thị thẻ 300px.
+- **Egress Supabase**: gần như không đổi. Mỗi chiều rộng là một cache key riêng nên lần MISS đầu tiên bị nhân lên theo số width; bù lại toàn bộ lượt xem lặp lại vẫn 0 byte Supabase như sau phần 1.
+- **Chưa đo được trên production**: project vẫn bị restriction, phải chờ Supabase phục hồi rồi mới `curl` được để lấy số thật.
+
 ### Còn lại ngoài phạm vi
 
-Ảnh **sản phẩm** (ProductCard trang chủ, ImageSlider trang chi tiết) vẫn tải bản gốc vì cùng lý do `unoptimized: true`. Đây là nguồn egress lớn thứ hai sau khung nhưng chưa đụng tới trong lần này.
+Hero, StorySection và FeedbackCarousel vẫn phục vụ ảnh gốc. Giờ chỉ là thêm một `cdnWidth` cho mỗi chỗ, nhưng chưa làm trong lần này.
 
 ---
 
