@@ -1,5 +1,3 @@
-import sharp from "sharp";
-
 /** Chiều rộng ảnh thumbnail khung — đủ nét cho lưới chọn khung ~100-200px @2x. */
 export const FRAME_THUMBNAIL_WIDTH = 400;
 export const FRAME_THUMBNAIL_CONTENT_TYPE = "image/webp";
@@ -12,6 +10,9 @@ export const FRAME_THUMBNAIL_CONTENT_TYPE = "image/webp";
  * gốc — nguồn cached egress lớn nhất của project (xem BUG_REPORT.md).
  */
 export async function createFrameThumbnail(input: Buffer): Promise<Buffer> {
+  // Import lazy: module này còn export hằng số dùng ở route upload, nạp sharp ở
+  // đầu file sẽ làm cả route 500 nếu runtime không nạp được native binary.
+  const { default: sharp } = await import("sharp");
   return sharp(input)
     .rotate()
     .resize({

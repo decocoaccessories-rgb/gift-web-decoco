@@ -131,7 +131,25 @@ for (const [file, pattern] of sized) {
   assert.match(source, pattern, `${file} must request a display-sized image`);
 }
 
-// 4. Canvas thiết kế PHẢI nạp ảnh nền gốc — bản thu nhỏ sẽ làm hỏng chất lượng in.
+// 4. sharp phải được nạp lazy: import ở đầu route khiến CẢ route 500 khi runtime
+// không nạp được native binary — kể cả request không cần resize (đã xảy ra thật
+// trên production, xem BUG_REPORT.md).
+const routeSource = await readFile(new URL("../app/media/[...path]/route.ts", import.meta.url), "utf8");
+assert.doesNotMatch(
+  routeSource,
+  /^import sharp from/m,
+  "the media route must not import sharp at module scope"
+);
+assert.match(routeSource, /await import\("sharp"\)/, "the media route must load sharp lazily");
+
+const helperSource = await readFile(new URL("../lib/images/frame-thumbnail.ts", import.meta.url), "utf8");
+assert.doesNotMatch(
+  helperSource,
+  /^import sharp from/m,
+  "the thumbnail helper must not import sharp at module scope"
+);
+
+// 5. Canvas thiết kế PHẢI nạp ảnh nền gốc — bản thu nhỏ sẽ làm hỏng chất lượng in.
 const canvasSource = await readFile(
   new URL("../components/DesignTool/DesignToolCanvas.tsx", import.meta.url),
   "utf8"

@@ -1,11 +1,37 @@
-import sharp from "sharp";
 import { isMediaWidth } from "@/lib/supabase/storage-url";
 
 const CACHE_ONE_YEAR = "public, max-age=31536000, immutable";
+/** Dùng khi chưa resize được: đủ ngắn để tự phục hồi, đủ dài để không nã Supabase. */
+const CACHE_FIVE_MINUTES = "public, max-age=300";
 
 /** GIF động sẽ mất animation nếu đi qua sharp -> phục vụ nguyên bản. */
 const RESIZABLE_TYPES = /^image\/(avif|jpeg|png|webp)(?:;|$)/i;
 const SERVABLE_TYPES = /^image\/(avif|gif|jpeg|png|webp)(?:;|$)/i;
+
+type SharpFactory = typeof import("sharp").default;
+let sharpFactory: SharpFactory | null | undefined;
+
+/**
+ * Nạp sharp theo kiểu lazy. Import ở đầu file khiến cả route 500 nếu runtime
+ * không nạp được native binary — tức là mất luôn đường phục vụ ảnh, kể cả
+ * request không cần resize.
+ */
+async function loadSharp(): Promise<SharpFactory | null> {
+  if (sharpFactory !== undefined) return sharpFactory;
+  try {
+    sharpFactory = (await import("sharp")).default;
+  } catch (error) {
+    console.error("sharp is unavailable, serving originals:", error);
+    sharpFactory = null;
+  }
+  return sharpFactory;
+}
+
+function setCacheHeaders(headers: Headers, value: string) {
+  headers.set("Cache-Control", value);
+  headers.set("CDN-Cache-Control", value);
+  headers.set("Vercel-CDN-Cache-Control", value);
+}
 
 export async function GET(
   request: Request,
@@ -58,39 +84,35 @@ export async function GET(
     });
   }
 
-  const headers = new Headers({
-    "Cache-Control": CACHE_ONE_YEAR,
-    "CDN-Cache-Control": CACHE_ONE_YEAR,
-    "Vercel-CDN-Cache-Control": CACHE_ONE_YEAR,
-    "X-Content-Type-Options": "nosniff",
-  });
+  const headers = new Headers({ "X-Content-Type-Options": "nosniff" });
+  setCacheHeaders(headers, CACHE_ONE_YEAR);
 
   if (width && RESIZABLE_TYPES.test(contentType)) {
-    try {
-      const original = Buffer.from(await upstream.arrayBuffer());
-      const resized = await sharp(original)
-        .rotate()
-        .resize({ width, withoutEnlargement: true, fit: "inside" })
-        .webp({ quality: 75 })
-        .toBuffer();
-      headers.set("Content-Type", "image/webp");
-      return new Response(new Uint8Array(resized), { status: 200, headers });
-    } catch (error) {
-      // Fail-soft: ảnh hỏng/định dạng lạ thì vẫn phục vụ được bản gốc.
-      console.warn("Media resize failed, serving the original:", error);
-      const fallback = await fetch(
-        `${supabaseUrl}/storage/v1/object/public/${objectPath}`,
-        { cache: "no-store" }
-      );
-      if (!fallback.ok || !fallback.body) {
-        return new Response("Image unavailable", {
-          status: fallback.status,
-          headers: { "Cache-Control": "no-store" },
-        });
+    const original = Buffer.from(await upstream.arrayBuffer());
+    const sharp = await loadSharp();
+
+    if (sharp) {
+      try {
+        const resized = await sharp(original)
+          .rotate()
+          .resize({ width, withoutEnlargement: true, fit: "inside" })
+          .webp({ quality: 75 })
+          .toBuffer();
+        headers.set("Content-Type", "image/webp");
+        return new Response(new Uint8Array(resized), { status: 200, headers });
+      } catch (error) {
+        // Ảnh này không xử lý được -> phục vụ bản gốc, vẫn cache dài vì lần sau
+        // cũng sẽ hỏng y hệt.
+        console.warn("Media resize failed, serving the original:", error);
       }
-      headers.set("Content-Type", contentType);
-      return new Response(fallback.body, { status: 200, headers });
+    } else {
+      // sharp hỏng là sự cố tạm thời của cả runtime -> cache ngắn để khi sửa
+      // xong CDN không giữ bản gốc suốt một năm dưới cache key `?w=`.
+      setCacheHeaders(headers, CACHE_FIVE_MINUTES);
     }
+
+    headers.set("Content-Type", contentType);
+    return new Response(new Uint8Array(original), { status: 200, headers });
   }
 
   headers.set("Content-Type", contentType);
