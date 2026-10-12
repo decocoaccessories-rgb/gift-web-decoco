@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 import type { Frame, FrameConfig } from "@/lib/supabase/types";
 
 interface FramePanelProps {
@@ -23,7 +24,8 @@ export default function FramePanel({
       <div className="flex-1 overflow-y-auto pr-1 -mr-1 custom-scrollbar">
         <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
           {frames.map((frame) => {
-            const previewUrl = frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage;
+            const rawPreviewUrl = frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage;
+            const previewUrl = rawPreviewUrl ? getCachedStorageUrl(rawPreviewUrl) : rawPreviewUrl;
             return (
               <button
                 key={frame.id}

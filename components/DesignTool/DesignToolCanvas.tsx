@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import TextPropsPanel from "./TextPropsPanel";
 import FramePanel from "./FramePanel";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 interface DesignToolCanvasProps {
   productId: string;
@@ -550,7 +551,7 @@ export default function DesignToolCanvas({
     // Load background image (frame overlay - on top of user photos)
     if (config.backgroundImage) {
       const { FabricImage } = await import("fabric");
-      const bg = await FabricImage.fromURL(config.backgroundImage, {
+      const bg = await FabricImage.fromURL(getCachedStorageUrl(config.backgroundImage), {
         crossOrigin: "anonymous"
       });
       const imgWidth = bg.width || targetWidth;

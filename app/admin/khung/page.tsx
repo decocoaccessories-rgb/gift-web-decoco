@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RefreshCw, Plus, Trash2, X, Loader2, Save, Upload, GripVertical } from "lucide-react";
 import type { Frame, FrameConfig } from "@/lib/supabase/types";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 type FrameRow = Pick<Frame, "id" | "name" | "product_id" | "thumbnail_url" | "config" | "sort_order">;
 
@@ -186,7 +187,8 @@ function SortableFrameCard({ frame, index, onEdit, onDelete }: SortableFrameCard
     zIndex: isDragging ? 10 : undefined,
   };
 
-  const previewUrl = frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage;
+  const rawPreviewUrl = frame.thumbnail_url || (frame.config as FrameConfig).backgroundImage;
+  const previewUrl = rawPreviewUrl ? getCachedStorageUrl(rawPreviewUrl) : rawPreviewUrl;
 
   return (
     <div
@@ -360,7 +362,7 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
               <div className="relative h-20 w-20 rounded-lg overflow-hidden border border-border bg-secondary/20 shrink-0">
                 {getCurrentBgUrl() ? (
                   <Image
-                    src={getCurrentBgUrl() as string}
+                    src={getCachedStorageUrl(getCurrentBgUrl() as string)}
                     alt="Ảnh nền khung"
                     fill
                     sizes="80px"

@@ -18,6 +18,7 @@ import {
   trackPurchase,
 } from "@/lib/analytics/gtm";
 import { getAttribution } from "@/lib/analytics/attribution";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 const schema = z.object({
   customer_name: z.string().min(2, "Vui lòng nhập họ tên người đặt (tối thiểu 2 ký tự)"),
@@ -662,7 +663,7 @@ export default function CheckoutPage() {
                 {designInfo.designImageUrl && (
                   <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-secondary/20">
                     <Image
-                      src={designInfo.designImageUrl}
+                      src={getCachedStorageUrl(designInfo.designImageUrl)}
                       alt="Thiết kế của bạn"
                       fill
                       className="object-cover"

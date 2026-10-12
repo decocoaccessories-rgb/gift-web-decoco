@@ -5,6 +5,7 @@ import { X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
 import type { Order } from "@/lib/supabase/types";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 type OrderRow = Pick<
   Order,
@@ -97,7 +98,7 @@ export default function OrderDetailDialog({ order, onClose }: Props) {
               </p>
               <div className="relative aspect-square w-48 rounded-lg overflow-hidden border border-border mx-auto">
                 <Image
-                  src={order.design_image_url}
+                  src={getCachedStorageUrl(order.design_image_url)}
                   alt="Thiết kế"
                   fill
                   className="object-cover"
