@@ -38,12 +38,15 @@ export async function GET(
   { params }: { params: Promise<{ path: string[] }> }
 ) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!supabaseUrl) {
+  const r2BaseUrl = process.env.R2_PUBLIC_BASE_URL?.replace(/\/+$/, "");
+  const allowSupabase = process.env.R2_SUPABASE_FALLBACK !== "false";
+  if (!r2BaseUrl && (!supabaseUrl || !allowSupabase)) {
     return new Response("Storage is not configured", { status: 503 });
   }
 
   const { path } = await params;
-  if (!path.length || path.some((segment) => !segment || segment === "." || segment === "..")) {
+  if (path.length < 2 || !["site", "products", "frames", "designs"].includes(path[0]) ||
+      path.some((segment) => !segment || segment === "." || segment === ".." || /[\\/\x00-\x1f]/.test(segment))) {
     return new Response("Invalid storage path", { status: 400 });
   }
 
@@ -63,10 +66,24 @@ export async function GET(
   }
 
   const objectPath = path.map(encodeURIComponent).join("/");
-  const upstream = await fetch(
-    `${supabaseUrl}/storage/v1/object/public/${objectPath}`,
-    { cache: "no-store" }
-  );
+  let upstream: Response;
+  let source = r2BaseUrl ? "r2" : "supabase";
+  try {
+    upstream = await fetch(
+      r2BaseUrl ? `${r2BaseUrl}/${objectPath}` : `${supabaseUrl}/storage/v1/object/public/${objectPath}`,
+      { cache: "no-store", signal: AbortSignal.timeout(15000) }
+    );
+    if (r2BaseUrl && upstream.status === 404 && allowSupabase && supabaseUrl) {
+      await upstream.body?.cancel();
+      upstream = await fetch(`${supabaseUrl}/storage/v1/object/public/${objectPath}`, {
+        cache: "no-store", signal: AbortSignal.timeout(15000),
+      });
+      source = "supabase";
+    }
+  } catch (error) {
+    console.error("Media fetch failed:", error);
+    return new Response("Image unavailable", { status: 502, headers: { "Cache-Control": "no-store" } });
+  }
 
   if (!upstream.ok || !upstream.body) {
     return new Response("Image unavailable", {
@@ -84,7 +101,7 @@ export async function GET(
     });
   }
 
-  const headers = new Headers({ "X-Content-Type-Options": "nosniff" });
+  const headers = new Headers({ "X-Content-Type-Options": "nosniff", "X-Media-Source": source });
   setCacheHeaders(headers, CACHE_ONE_YEAR);
 
   if (width && RESIZABLE_TYPES.test(contentType)) {

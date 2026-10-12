@@ -1,5 +1,7 @@
 "use client";
 
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
+
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -265,7 +267,7 @@ export default function AdminOrdersPage() {
                       <td className="px-4 py-3">
                         {order.design_image_url ? (
                           <a
-                            href={order.design_image_url}
+                            href={getCachedStorageUrl(order.design_image_url)}
                             download
                             target="_blank"
                             rel="noopener noreferrer"

@@ -16,10 +16,15 @@ export function getCachedStorageUrl(
   source: string,
   supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 ): string {
-  if (!supabaseUrl) return source;
+  if (source.startsWith("/media/")) return source;
 
   try {
     const sourceUrl = new URL(source);
+    const siteUrl = new URL(process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://trangsucdecoco.vn");
+    if (sourceUrl.origin === siteUrl.origin && sourceUrl.pathname.startsWith("/media/")) {
+      return `${sourceUrl.pathname}${sourceUrl.search}`;
+    }
+    if (!supabaseUrl) return source;
     const projectUrl = new URL(supabaseUrl);
 
     if (
@@ -53,5 +58,7 @@ export function getResizedStorageUrl(
 ): string {
   const cached = getCachedStorageUrl(source, supabaseUrl);
   if (!cached.startsWith("/media/")) return cached;
-  return `${cached}?w=${width}`;
+  const resized = new URL(cached, "https://media.local");
+  resized.searchParams.set("w", String(width));
+  return `${resized.pathname}${resized.search}`;
 }

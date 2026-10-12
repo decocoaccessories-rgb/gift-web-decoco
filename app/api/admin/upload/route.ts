@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { uploadStorageImage } from "@/lib/storage/upload";
 import {
   FRAME_THUMBNAIL_CONTENT_TYPE,
   createFrameThumbnail,
@@ -41,25 +41,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "File too large (max 10MB)" }, { status: 413 });
   }
 
-  const adminSupabase = createAdminClient();
   const ext = file.name.split(".").pop() ?? "jpg";
   const path = folder ? `${folder}/${Date.now()}.${ext}` : `${Date.now()}.${ext}`;
 
   const arrayBuffer = await file.arrayBuffer();
-  const { error: uploadError } = await adminSupabase.storage
-    .from(bucket)
-    .upload(path, arrayBuffer, {
-      contentType: file.type,
-      cacheControl: "31536000",
-      upsert: true,
-    });
-
-  if (uploadError) {
-    console.error("Upload error:", uploadError);
+  let url: string;
+  try {
+    url = await uploadStorageImage(bucket, path, new Uint8Array(arrayBuffer), file.type, true);
+  } catch (error) {
+    console.error("Upload error:", error);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
-
-  const { data: urlData } = adminSupabase.storage.from(bucket).getPublicUrl(path);
 
   // Ảnh nền khung được hiển thị ở ~100px trong lưới chọn khung nhưng file gốc
   // nặng vài MB. Sinh thêm bản thumbnail nhỏ để lưới không phải tải ảnh gốc.
@@ -68,21 +60,12 @@ export async function POST(request: NextRequest) {
     try {
       const thumbnailPath = toThumbnailPath(path);
       const thumbnail = await createFrameThumbnail(Buffer.from(arrayBuffer));
-      const { error: thumbnailError } = await adminSupabase.storage
-        .from(bucket)
-        .upload(thumbnailPath, thumbnail, {
-          contentType: FRAME_THUMBNAIL_CONTENT_TYPE,
-          cacheControl: "31536000",
-          upsert: true,
-        });
-      if (thumbnailError) throw thumbnailError;
-      thumbnailUrl = adminSupabase.storage.from(bucket).getPublicUrl(thumbnailPath)
-        .data.publicUrl;
+      thumbnailUrl = await uploadStorageImage(bucket, thumbnailPath, thumbnail, FRAME_THUMBNAIL_CONTENT_TYPE, true);
     } catch (error) {
       // Fail-soft: mất thumbnail chỉ làm lưới nặng hơn, không được chặn upload.
       console.warn("Frame thumbnail generation failed:", error);
     }
   }
 
-  return NextResponse.json({ url: urlData.publicUrl, thumbnailUrl }, { status: 200 });
+  return NextResponse.json({ url, thumbnailUrl }, { status: 200 });
 }

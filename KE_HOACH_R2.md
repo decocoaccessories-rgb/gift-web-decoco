@@ -10,9 +10,9 @@ nó khoá lại ngay lập tức. Vì vậy **toàn bộ việc copy phải xong
 
 ## Giai đoạn 0 — Mở khoá (bạn làm, ~5 phút)
 
-- [ ] Nâng project `xknkhczeuyjxtiljeaoz` lên **Pro** trong Supabase Dashboard → Settings → Billing.
+- [x] Nâng project `xknkhczeuyjxtiljeaoz` lên **Pro** trong Supabase Dashboard → Settings → Billing. Người dùng xác nhận 12/10/2026.
 - [ ] **Ghi lại ngày gia hạn kế tiếp** mà dashboard hiển thị. Đặt nhắc lịch **trước ngày đó 3 ngày** — đây là hạn chót để hạ về Free, quên là mất thêm $25.
-- [ ] Kiểm tra restriction đã gỡ:
+- [x] Kiểm tra restriction đã gỡ: REST products trả HTTP 200 ngày 12/10/2026.
 
 ```bash
 curl -s -o /dev/null -w "%{http_code}\n" \
@@ -26,7 +26,7 @@ curl -s -o /dev/null -w "%{http_code}\n" \
 
 ## Giai đoạn 1 — Thu hồi thành quả đã code (ngay sau khi mở khoá)
 
-- [ ] **Xác minh sharp có chạy trên Vercel không** — đây là ẩn số lớn nhất còn lại:
+- [x] **Xác minh sharp có chạy trên Vercel không**: production trả `image/png` và `max-age=300` ngày 12/10/2026. Sharp chưa nạp được. Đã thêm tracing native package vào `next.config.ts`, chờ deploy rồi kiểm tra WebP.
 
 ```bash
 curl -sI 'https://trangsucdecoco.vn/media/products/1788762943877.png?w=640' \
@@ -38,7 +38,7 @@ curl -sI 'https://trangsucdecoco.vn/media/products/1788762943877.png?w=640' \
 | `image/webp` | sharp OK, resize hoạt động |
 | `image/png` + `max-age=300` | sharp không nạp được trên Vercel → cần sửa cách đóng gói |
 
-- [ ] **Chạy backfill thumbnail khung**:
+- [x] **Chạy backfill thumbnail khung**: 4 khung, 0 lỗi; 1,28 MB → 0,03 MB (-97,9%). Kiểm tra cả 4 thumbnail trả HTTP 200, chiều rộng 400px. Chạy lại bỏ qua cả 4.
 
 ```bash
 node --env-file=.env.local scripts/backfill-frame-thumbnails.mjs --dry-run
@@ -76,12 +76,13 @@ R2_PUBLIC_BASE_URL=https://cdn.trangsucdecoco.vn
 
 ### 2b. Tôi làm phần code
 
-- [ ] `/media` route: đọc từ R2 trước, **fallback về Supabase** nếu object chưa có
+- [x] `/media` route: đọc từ R2 trước, **fallback về Supabase** nếu object chưa có
       ở R2 → chuyển dần, không downtime.
-- [ ] `/api/admin/upload` và `/api/design/export`: ghi vào R2 (`@aws-sdk/client-s3`).
-- [ ] Script `scripts/migrate-storage-to-r2.mjs`: copy toàn bộ object từ 4 bucket
+- [x] `/api/admin/upload` và `/api/design/export`: ghi vào R2 (`@aws-sdk/client-s3`). Khi chưa có cấu hình R2, vẫn dùng Supabase trong giai đoạn chuẩn bị; lỗi ghi R2 không chuyển ngược sang Supabase.
+- [x] Script `scripts/migrate-storage-to-r2.mjs`: copy toàn bộ object từ 4 bucket
       Supabase (`site`, `products`, `frames`, `designs`) sang R2, giữ nguyên đường dẫn.
-- [ ] Test + build + deploy.
+- [x] Test + build: `npm.cmd test`, `npm.cmd run test:r2`, test export thiết kế và test email người nhận đều qua; `npm.cmd run build` thành công, TypeScript và 37/37 trang.
+- [ ] Deploy rồi xác minh resize WebP trên Vercel và nguồn ảnh R2.
 
 **Không phải sửa database.** URL Supabase đang nằm trong `products.images`,
 `frames.config`, `orders.design_image_url` giữ nguyên — `getCachedStorageUrl` vốn
@@ -90,9 +91,9 @@ chuyện nội bộ của nó.
 
 ### 2c. Chạy di chuyển
 
-- [ ] `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --dry-run`
+- [x] `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --dry-run`: 417 object, 310,59 MiB ngày 12/10/2026; chỉ đọc danh sách, không tải ảnh.
 - [ ] `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs`
-- [ ] Đối chiếu số object R2 với Supabase.
+- [ ] Đối chiếu số object R2 với Supabase: chạy `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --verify-only`. Báo cáo từng bucket nằm trong `.vercel/r2-migration-verify.json`; phải có `failed=0` và `verified=sourceObjects`.
 - [ ] Duyệt lại site: trang chủ, danh mục, chi tiết, công cụ thiết kế, admin —
       xác nhận ảnh hiện đủ.
 
@@ -100,7 +101,7 @@ chuyện nội bộ của nó.
 
 ## Giai đoạn 3 — Cắt đuôi và hạ về Free (trước ngày gia hạn)
 
-- [ ] Bỏ nhánh fallback Supabase trong `/media` (tôi làm). Deploy.
+- [ ] Tắt fallback Supabase bằng `R2_SUPABASE_FALLBACK=false` trong Production + Preview rồi deploy. Cờ này chặn cả đọc lẫn ghi Supabase Storage; chỉ bật sau khi copy + verify hoàn tất.
 - [ ] Theo dõi 2–3 ngày, xác nhận không còn request nào chạm Supabase Storage.
 - [ ] **Xoá toàn bộ object trong Supabase Storage** — Free chỉ cho 1 GB, và không
       còn lý do giữ bản sao. Giữ lại một bản backup ở máy nếu thấy cần.
@@ -121,7 +122,19 @@ chuyện nội bộ của nó.
 Và lời khuyên "gộp deploy để đỡ tốn egress" trở thành vô nghĩa — R2 không tính
 tiền egress, deploy bao nhiêu lần cũng được.
 
-## Rủi ro cần biết trước
+## Tiến độ thực hiện 12/10/2026
+
+- Inventory: `site` 25 file / 20,48 MiB; `products` 196 / 174,52 MiB; `frames` 47 / 21,93 MiB; `designs` 149 / 93,66 MiB. Tổng 417 file / 310,59 MiB.
+- Các URL cũ trong database giữ nguyên. Link tải ảnh thiết kế trong admin và email mới đi qua `/media`; upload R2 trả URL tuyệt đối của website để API đặt hàng tiếp tục chấp nhận.
+- Migration kiểm tra Content-MD5 khi upload, lưu SHA-256 + metadata nguồn, xác minh HEAD sau upload; chạy lại bỏ qua file đã xác minh và từ chối ghi đè file khác nguồn. `--verify-only` chỉ đối chiếu metadata/dung lượng, không tải lại toàn bộ nội dung.
+- `.env.local` chưa có `R2_*`; chưa có thông tin ngày gia hạn. Chưa copy thật hoặc tắt fallback.
+- Vercel connector báo 403 cho team dự án; Vercel CLI chưa đăng nhập. Cần đăng nhập `vercel.cmd login` trước khi deploy.
+- Trang chủ, danh mục và một trang chi tiết sản phẩm đều HTTP 200. Chưa hoàn tất kiểm tra trực quan/Usage Dashboard vì công cụ trình duyệt không khởi tạo được.
+- Hướng dẫn R2: [tạo token S3](https://developers.cloudflare.com/r2/api/tokens/), [gắn custom domain](https://developers.cloudflare.com/r2/buckets/public-buckets/).
+- Thêm đủ 5 biến `R2_*` ở mục 2a vào `.env.local` và Vercel Production + Preview. Không gửi secret vào chat hoặc commit. Để `R2_SUPABASE_FALLBACK=true` trong giai đoạn copy.
+- Sau deploy, kiểm tra `/media/...` có `X-Media-Source: r2` cho file đã copy; kiểm tra `?w=640` có `Content-Type: image/webp` để xác nhận sharp trên Linux.
+
+## Rủi ro còn lại
 
 - **Quên hạ về Free** → mất thêm $25. Đặt nhắc lịch ngay ở Giai đoạn 0.
 - **Copy chưa xong mà đã hết tháng Pro** → kẹt giữa chừng. Làm Giai đoạn 2 sớm,

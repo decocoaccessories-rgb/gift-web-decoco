@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/server";
+import { uploadStorageImage } from "@/lib/storage/upload";
 
 const ALLOWED_MIME = ["image/png", "image/jpeg"] as const;
 const MAX_BYTES = 20 * 1024 * 1024;
@@ -52,25 +52,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   }
 
-  const supabase = createAdminClient();
   const ext = parsed.mimeType === "image/png" ? "png" : "jpg";
   const path = `orders/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-  const { error: uploadError } = await supabase.storage
-    .from("designs")
-    .upload(path, parsed.buffer, {
-      contentType: parsed.mimeType,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    console.error("Storage upload error:", uploadError);
+  try {
+    const url = await uploadStorageImage("designs", path, parsed.buffer, parsed.mimeType);
+    return NextResponse.json({ url }, { status: 200 });
+  } catch (error) {
+    console.error("Storage upload error:", error);
     return NextResponse.json(
-      { error: "Upload failed", detail: uploadError.message },
+      { error: "Upload failed" },
       { status: 500 },
     );
   }
-
-  const { data: urlData } = supabase.storage.from("designs").getPublicUrl(path);
-  return NextResponse.json({ url: urlData.publicUrl }, { status: 200 });
 }

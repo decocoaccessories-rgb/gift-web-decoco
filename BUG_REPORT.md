@@ -435,6 +435,17 @@ Cách giảm: gộp nhiều thay đổi vào một lần deploy thay vì đẩy 
 
 ---
 
+## Thực hiện kế hoạch R2 sau khi nâng Pro — 12/10/2026
+
+- Người dùng xác nhận đã nâng Supabase Pro. REST `products?select=slug&limit=1` trả HTTP 200.
+- Production `/media/products/1788762943877.png?w=640` trả HTTP 200, `image/png`, `max-age=300`: resize chưa hoạt động. Đã bổ sung tracing `sharp` và `@img/sharp-*` cho route media/upload; build trace có sharp và binary Windows. Chưa xác minh runtime Linux/Vercel vì chưa deploy.
+- Backfill thật: **4 khung, 0 bỏ qua, 0 lỗi; 1,28 MB → 0,03 MB (-97,9%)**. Khung tim 8.692 byte, sao 14.332 byte, trơn 558 byte, hồng 5.072 byte; cả 4 HTTP 200 và rộng 400px. Lần chạy lại bỏ qua cả 4, không tải lại ảnh gốc.
+- Dry-run R2: `site` 25 file / 21.477.112 byte; `products` 196 / 183.000.100; `frames` 47 / 22.995.296; `designs` 149 / 98.206.889. **Tổng 417 file / 325.679.397 byte (310,59 MiB)**. Chưa copy thật.
+- Code `/media` đọc R2 trước, fallback chỉ khi R2 trả 404. API admin upload và design export ghi R2 khi cấu hình đủ; lỗi ghi R2 không ghi ngược Supabase. URL cũ giữ nguyên trong database. Link tải ảnh admin/email mới đi qua media. Có cờ `R2_SUPABASE_FALLBACK=false` để cắt cả đọc/ghi Storage sau migration.
+- `npm.cmd test`, `npm.cmd run test:r2`, test export và test email người nhận: PASS. Build: compiled 77s, TypeScript 28,9s, 37/37 trang; `git diff --check` không có lỗi.
+- Trang chủ/danh mục/chi tiết đều HTTP 200. Chưa kiểm tra trực quan, Usage baseline hoặc ngày gia hạn. Công cụ trình duyệt lỗi khởi tạo.
+- Chờ hạ tầng: `.env.local` chưa có R2; Vercel connector 403 sai quyền team, CLI chưa đăng nhập. Chưa deploy, tắt fallback, xoá Storage hoặc hạ gói.
+
 ## Phụ lục — fix vòng 1 (28/09/2026), giữ để tham chiếu
 
 - Đã áp dụng: `app/media/[...path]/route.ts`, `lib/supabase/storage-url.ts`, `lib/supabase/server.ts` (`createPublicClient` cache 5 phút), các điểm đọc public và upload ảnh admin.

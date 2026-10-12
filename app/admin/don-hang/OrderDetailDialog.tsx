@@ -5,7 +5,7 @@ import { X, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatPrice } from "@/lib/utils";
 import type { Order } from "@/lib/supabase/types";
-import { getResizedStorageUrl } from "@/lib/supabase/storage-url";
+import { getCachedStorageUrl, getResizedStorageUrl } from "@/lib/supabase/storage-url";
 
 type OrderRow = Pick<
   Order,
@@ -106,7 +106,7 @@ export default function OrderDetailDialog({ order, onClose }: Props) {
               </div>
               <div className="text-center">
                 <a
-                  href={order.design_image_url}
+                  href={getCachedStorageUrl(order.design_image_url)}
                   download
                   target="_blank"
                   rel="noopener noreferrer"

@@ -23,11 +23,11 @@ const apiSource = await readFile("app/api/design/export/route.ts", "utf8");
 
 console.log("\n[API] app/api/design/export/route.ts");
 check("returns 500 on upload error", () => {
-  const block = apiSource.match(/if \(uploadError\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const block = apiSource.match(/catch \(error\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
   assert.match(block, /status:\s*500/);
 });
 check("does NOT silently return 200 on upload error", () => {
-  const block = apiSource.match(/if \(uploadError\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
+  const block = apiSource.match(/catch \(error\) \{[\s\S]*?\n  \}/)?.[0] ?? "";
   assert.doesNotMatch(block, /status:\s*200/);
   assert.doesNotMatch(block, /url:\s*null/);
 });

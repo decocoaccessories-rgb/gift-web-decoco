@@ -77,7 +77,7 @@ assert.match(routeSource, /max-age=31536000/);
 assert.match(routeSource, /cache: "no-store"/);
 
 const uploadSource = await readFile(
-  new URL("../app/api/admin/upload/route.ts", import.meta.url),
+  new URL("../lib/storage/upload.ts", import.meta.url),
   "utf8"
 );
 assert.match(uploadSource, /cacheControl: "31536000"/);

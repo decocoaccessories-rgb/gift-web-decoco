@@ -6,9 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test:r2": "node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-r2-storage.mjs && node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-r2-uploads.mjs",
     "test": "node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-cached-egress-fix.mjs && node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-design-tool-media-cache.mjs && node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-frame-thumbnail.mjs && node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-product-image-resize.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1149.0",
     "@base-ui/react": "^1.4.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",

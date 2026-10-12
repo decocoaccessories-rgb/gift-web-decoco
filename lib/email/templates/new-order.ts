@@ -1,5 +1,6 @@
 import type { Order } from "@/lib/supabase/types";
 import { formatPrice } from "@/lib/utils";
+import { getCachedStorageUrl } from "@/lib/supabase/storage-url";
 
 export interface NewOrderEmailData {
   order: Pick<
@@ -70,6 +71,7 @@ export function renderNewOrderEmail(data: NewOrderEmailData): {
   const subject = `[DECOCO] Đơn mới #${order.order_number} — ${order.customer_name}`;
   const created = new Date(order.created_at).toLocaleString("vi-VN");
   const adminLink = `${appUrl.replace(/\/$/, "")}/admin/don-hang`;
+  const designLink = order.design_image_url ? new URL(getCachedStorageUrl(order.design_image_url), appUrl).href : null;
 
   // Người nhận có thể khác người đặt (đơn tặng quà). Fallback về customer_* cho đơn cũ.
   const recipientName = order.recipient_name ?? order.customer_name;
@@ -125,7 +127,7 @@ export function renderNewOrderEmail(data: NewOrderEmailData): {
               )
             : ""
         }
-        ${order.design_image_url ? row("Ảnh thiết kế", `<a href="${escape(order.design_image_url)}" style="color:#7a1f3a;">Tải ảnh</a>`) : ""}
+        ${designLink ? row("Ảnh thiết kế", `<a href="${escape(designLink)}" style="color:#7a1f3a;">Tải ảnh</a>`) : ""}
       </tbody>
     </table>
 
