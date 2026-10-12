@@ -263,6 +263,7 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [uploadingBg, setUploadingBg] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(frame?.thumbnail_url ?? null);
   const bgInputRef = useRef<HTMLInputElement>(null);
 
   function getCurrentBgUrl(): string | null {
@@ -294,6 +295,8 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
       }
       parsed.backgroundImage = data.url as string;
       setConfigJson(JSON.stringify(parsed, null, 2));
+      // null khi server không sinh được thumbnail -> quay về dùng ảnh gốc.
+      setThumbnailUrl((data.thumbnailUrl as string | null) ?? null);
       toast.success("Đã tải ảnh nền");
     } finally {
       setUploadingBg(false);
@@ -316,7 +319,7 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
     const payload = {
       name,
       product_id: productId || null,
-      thumbnail_url: config.backgroundImage || null,
+      thumbnail_url: thumbnailUrl || config.backgroundImage || null,
       config,
       sort_order: frame?.sort_order ?? 0,
     };
@@ -360,9 +363,9 @@ function FrameEditDialog({ frame, onClose, onSaved }: FrameEditDialogProps) {
             <Label>Ảnh nền</Label>
             <div className="flex items-start gap-3">
               <div className="relative h-20 w-20 rounded-lg overflow-hidden border border-border bg-secondary/20 shrink-0">
-                {getCurrentBgUrl() ? (
+                {thumbnailUrl || getCurrentBgUrl() ? (
                   <Image
-                    src={getCachedStorageUrl(getCurrentBgUrl() as string)}
+                    src={getCachedStorageUrl((thumbnailUrl ?? getCurrentBgUrl()) as string)}
                     alt="Ảnh nền khung"
                     fill
                     sizes="80px"

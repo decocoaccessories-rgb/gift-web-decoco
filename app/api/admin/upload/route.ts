@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/server";
+import {
+  FRAME_THUMBNAIL_CONTENT_TYPE,
+  createFrameThumbnail,
+  toThumbnailPath,
+} from "@/lib/images/frame-thumbnail";
 
 export async function POST(request: NextRequest) {
   // Verify admin session
@@ -56,5 +61,28 @@ export async function POST(request: NextRequest) {
 
   const { data: urlData } = adminSupabase.storage.from(bucket).getPublicUrl(path);
 
-  return NextResponse.json({ url: urlData.publicUrl }, { status: 200 });
+  // Ảnh nền khung được hiển thị ở ~100px trong lưới chọn khung nhưng file gốc
+  // nặng vài MB. Sinh thêm bản thumbnail nhỏ để lưới không phải tải ảnh gốc.
+  let thumbnailUrl: string | null = null;
+  if (bucket === "frames") {
+    try {
+      const thumbnailPath = toThumbnailPath(path);
+      const thumbnail = await createFrameThumbnail(Buffer.from(arrayBuffer));
+      const { error: thumbnailError } = await adminSupabase.storage
+        .from(bucket)
+        .upload(thumbnailPath, thumbnail, {
+          contentType: FRAME_THUMBNAIL_CONTENT_TYPE,
+          cacheControl: "31536000",
+          upsert: true,
+        });
+      if (thumbnailError) throw thumbnailError;
+      thumbnailUrl = adminSupabase.storage.from(bucket).getPublicUrl(thumbnailPath)
+        .data.publicUrl;
+    } catch (error) {
+      // Fail-soft: mất thumbnail chỉ làm lưới nặng hơn, không được chặn upload.
+      console.warn("Frame thumbnail generation failed:", error);
+    }
+  }
+
+  return NextResponse.json({ url: urlData.publicUrl, thumbnailUrl }, { status: 200 });
 }

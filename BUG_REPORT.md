@@ -166,6 +166,78 @@ npm.cmd run build     -> exit 0, build thành công, route /media/[...path] có 
 
 ---
 
+## Phần 2 — Sinh thumbnail nhỏ cho khung (12/10/2026)
+
+Phần 1 chuyển byte từ Supabase sang Vercel CDN nhưng **không giảm số byte**: lưới chọn khung vẫn tải ảnh gốc 1772×1535 để hiển thị ở ~100px, vì `images.unoptimized: true` (quota Vercel Image Optimization đã hết) khiến `sizes` bị bỏ qua. Phần 2 cắt luôn số byte đó.
+
+### Thiết kế
+
+```
+Upload ảnh nền khung (admin)
+  ├─► frames/<ts>.png          ảnh gốc, canvas vẫn dùng bản này
+  └─► frames/<ts>-thumb.webp   WebP 400px  ──► lưu vào frames.thumbnail_url
+                                              └─► FramePanel + lưới admin dùng bản này
+```
+
+`thumbnail_url` trước đây được gán bằng chính `config.backgroundImage` (`app/admin/khung/page.tsx:317`) — tức "thumbnail" là ảnh gốc. Giờ nó trỏ tới bản WebP 400px. `FramePanel` vốn đã ưu tiên `thumbnail_url` nên không cần đổi logic chọn ảnh.
+
+### Files Changed
+
+| File | Thay đổi |
+| --- | --- |
+| `lib/images/frame-thumbnail.ts` | **Mới** — `createFrameThumbnail()` (sharp → WebP 400px, q72) + `toThumbnailPath()` |
+| `app/api/admin/upload/route.ts` | Bucket `frames`: upload thêm bản `-thumb.webp`, trả `thumbnailUrl`. Fail-soft |
+| `app/admin/khung/page.tsx` | Giữ `thumbnailUrl` trong state, lưu vào `thumbnail_url`; preview dialog dùng bản nhỏ |
+| `scripts/backfill-frame-thumbnails.mjs` | **Mới** — sinh thumbnail cho khung đã có, idempotent, có `--dry-run` |
+| `scripts/test-frame-thumbnail.mjs` | **Mới** — test |
+| `package.json` | thêm `sharp@^0.35.5` |
+
+Không đổi schema: `frames.thumbnail_url` và API `POST/PATCH /api/admin/frames` đã nhận sẵn field này.
+
+Fail-soft: nếu sharp lỗi, upload vẫn thành công, `thumbnailUrl = null`, admin quay về dùng ảnh gốc như cũ — không chặn luồng tạo khung.
+
+### Test Results — **Thành công**
+
+```text
+node --experimental-strip-types scripts/test-frame-thumbnail.mjs
+PASS: Frame thumbnails are WebP 400px, aspect ratio preserved.
+PASS: ảnh mẫu 1772x1535 PNG 7464 KB -> 11 KB (-99.8%); 1772px -> 400px là ~1/20 số pixel.
+PASS: Small images are not enlarged; thumbnails never overwrite the original.
+PASS: Upload route generates thumbnails fail-soft; admin saves the thumbnail URL.
+exit=0
+
+node --experimental-strip-types scripts/test-cached-egress-fix.mjs        -> exit 0 (4 PASS)
+node --experimental-strip-types scripts/test-design-tool-media-cache.mjs  -> exit 0 (4 PASS)
+npx.cmd tsc --noEmit  -> exit 0
+npm.cmd run build     -> exit 0, Compiled successfully in 50s, 37/37 static pages
+```
+
+Con số -99,8% là trên **ảnh mẫu tổng hợp** (nhiễu gaussian — PNG nén rất kém, WebP lossy nén rất tốt) nên không đại diện cho ảnh khung thật. Phần chắc chắn đúng với mọi ảnh là hình học: 1772px → 400px ≈ **1/20 số pixel**.
+
+### Backfill cho khung đã có — **chưa chạy được**
+
+```text
+node --env-file=.env.local scripts/backfill-frame-thumbnails.mjs --dry-run
+Không đọc được bảng frames: Service for this project is restricted due to the
+following violations: exceed_cached_egress_quota.
+exit=1
+```
+
+Script hoạt động đúng (báo đúng lý do, thoát sạch) nhưng **không chạy được tới khi Supabase hết restriction**. Khung cũ sẽ vẫn dùng ảnh gốc làm thumbnail cho tới lúc đó. Sau khi project phục hồi, chạy:
+
+```bash
+node --env-file=.env.local scripts/backfill-frame-thumbnails.mjs --dry-run   # xem trước
+node --env-file=.env.local scripts/backfill-frame-thumbnails.mjs            # thực thi
+```
+
+Script in ra dung lượng trước/sau từng khung và tổng mức giảm — đó mới là con số thật cần ghi lại vào báo cáo này.
+
+### Còn lại ngoài phạm vi
+
+Ảnh **sản phẩm** (ProductCard trang chủ, ImageSlider trang chi tiết) vẫn tải bản gốc vì cùng lý do `unoptimized: true`. Đây là nguồn egress lớn thứ hai sau khung nhưng chưa đụng tới trong lần này.
+
+---
+
 ## Phụ lục — fix vòng 1 (28/09/2026), giữ để tham chiếu
 
 - Đã áp dụng: `app/media/[...path]/route.ts`, `lib/supabase/storage-url.ts`, `lib/supabase/server.ts` (`createPublicClient` cache 5 phút), các điểm đọc public và upload ảnh admin.
