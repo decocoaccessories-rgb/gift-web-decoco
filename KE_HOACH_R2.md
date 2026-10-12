@@ -11,7 +11,18 @@ nó khoá lại ngay lập tức. Vì vậy **toàn bộ việc copy phải xong
 ## Giai đoạn 0 — Mở khoá (bạn làm, ~5 phút)
 
 - [x] Nâng project `xknkhczeuyjxtiljeaoz` lên **Pro** trong Supabase Dashboard → Settings → Billing. Người dùng xác nhận 12/10/2026.
-- [ ] **Ghi lại ngày gia hạn kế tiếp** mà dashboard hiển thị. Đặt nhắc lịch **trước ngày đó 3 ngày** — đây là hạn chót để hạ về Free, quên là mất thêm $25.
+- [x] **Ngày gia hạn Supabase Pro: 12/11/2026.** Đã đọc trực tiếp từ dashboard
+      (Billing → Upcoming Invoice: "October 12 - November 12 · 30 days left").
+      Chu kỳ Free cũ reset ngày 27 **không còn áp dụng** — Supabase lấy ngày nâng
+      cấp làm mốc mới.
+      ⚠️ **HẠN CHÓT HẠ VỀ FREE: trước 12/11/2026.** Quên là mất thêm $25.
+      (Đừng nhầm với chu kỳ R2 cũng là 12/10–12/11 — hai thứ khác nhau.)
+- [ ] Chủ dự án đặt nhắc lịch ~09/11/2026.
+- [x] **Spend cap của Supabase đang TẮT** ("Spend cap is disabled — You will be
+      charged for usage beyond the included quota"). Trên Free, spend cap bật là
+      lý do project bị *khoá* thay vì bị tính tiền; trên Pro thì ngược lại —
+      không còn chốt chặn, vượt hạn mức là trừ thẻ. Pro bao 250 GB egress, mức
+      dùng thực ~5 GB/tháng nên rủi ro thấp, nhưng lưới an toàn đã bị gỡ.
 - [x] Kiểm tra restriction đã gỡ: REST products trả HTTP 200 ngày 12/10/2026.
 
 ```bash
@@ -88,11 +99,12 @@ Ghi lại con số "trước → sau" mà script in ra, dán vào `BUG_REPORT.md
 - [x] Token `decoco-web-storage` (Account API Token), quyền **Object Read & Write**,
       phạm vi đúng bucket `decoco`. Đã ghi vào `.env.local`.
 - [x] `.env.local`: đủ 6 biến.
-- [ ] **Vercel: mới có 3/5 biến bắt buộc** — còn thiếu `R2_ACCESS_KEY_ID` và
-      `R2_SECRET_ACCESS_KEY` (chủ dự án tự nhập, type **Secret**, Production + Preview).
-      ⚠️ **KHÔNG deploy cho tới khi đủ 5 biến**: `isR2Configured()` ném lỗi khi có
-      một phần cấu hình, làm `/api/admin/upload` và `/api/design/export` trả 500 —
-      cái sau nằm trong luồng đặt hàng của khách.
+- [x] **Vercel: đủ 5/5 biến bắt buộc + `R2_SUPABASE_FALLBACK`**, cả Production
+      lẫn Preview (2 biến credential do chủ dự án tự nhập, type Secret).
+      Bài học giữ lại: `isR2Configured()` ném lỗi khi cấu hình **dở dang** (có
+      một phần, không đủ 5). Nếu sau này sửa biến R2, đừng để deploy chạy giữa
+      chừng — `/api/admin/upload` và `/api/design/export` sẽ trả 500, cái sau nằm
+      trong luồng đặt hàng của khách.
 
 ```
 R2_ACCOUNT_ID=
@@ -123,7 +135,7 @@ chuyện nội bộ của nó.
 - [x] Copy thật xong 12/10/2026: **418/418 object, 0 lỗi** (site 25, products 196,
       frames 47, designs 150). Số object R2 khớp nguồn từng bucket.
 - [x] `--verify-only` chạy độc lập: **418/418 verified, 0 lỗi**.
-- [ ] (cũ) Đối chiếu số object R2 với Supabase: chạy `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --verify-only`. Báo cáo từng bucket nằm trong `.vercel/r2-migration-verify.json`; phải có `failed=0` và `verified=sourceObjects`.
+- [x] Đối chiếu số object R2 với Supabase — đã chạy, 418/418 verified, 0 lỗi: `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --verify-only`. Báo cáo từng bucket nằm trong `.vercel/r2-migration-verify.json`; phải có `failed=0` và `verified=sourceObjects`.
 - [x] Duyệt lại site sau deploy `eb4b666` — **Giai đoạn 2 HOÀN TẤT 12/10/2026**:
 
 ```text
@@ -187,21 +199,42 @@ tiền egress, deploy bao nhiêu lần cũng được.
 
 ## Tiến độ thực hiện 12/10/2026
 
-- Inventory: `site` 25 file / 20,48 MiB; `products` 196 / 174,52 MiB; `frames` 47 / 21,93 MiB; `designs` 149 / 93,66 MiB. Tổng 417 file / 310,59 MiB.
-- Các URL cũ trong database giữ nguyên. Link tải ảnh thiết kế trong admin và email mới đi qua `/media`; upload R2 trả URL tuyệt đối của website để API đặt hàng tiếp tục chấp nhận.
-- Migration kiểm tra Content-MD5 khi upload, lưu SHA-256 + metadata nguồn, xác minh HEAD sau upload; chạy lại bỏ qua file đã xác minh và từ chối ghi đè file khác nguồn. `--verify-only` chỉ đối chiếu metadata/dung lượng, không tải lại toàn bộ nội dung.
-- `.env.local` chưa có `R2_*`; chưa có thông tin ngày gia hạn. Chưa copy thật hoặc tắt fallback.
-- Vercel connector báo 403 cho team dự án; Vercel CLI chưa đăng nhập. Cần đăng nhập `vercel.cmd login` trước khi deploy.
-- Trang chủ, danh mục và một trang chi tiết sản phẩm đều HTTP 200. Chưa hoàn tất kiểm tra trực quan/Usage Dashboard vì công cụ trình duyệt không khởi tạo được.
-- Hướng dẫn R2: [tạo token S3](https://developers.cloudflare.com/r2/api/tokens/), [gắn custom domain](https://developers.cloudflare.com/r2/buckets/public-buckets/).
-- Thêm đủ 5 biến `R2_*` ở mục 2a vào `.env.local` và Vercel Production + Preview. Không gửi secret vào chat hoặc commit. Để `R2_SUPABASE_FALLBACK=true` trong giai đoạn copy.
-- Sau deploy, kiểm tra `/media/...` có `X-Media-Source: r2` cho file đã copy; kiểm tra `?w=640` có `Content-Type: image/webp` để xác nhận sharp trên Linux.
+**Giai đoạn 0, 1, 2: XONG. Giai đoạn 3: chưa bắt đầu.**
+
+- Inventory cuối: `site` 25 / `products` 196 / `frames` 47 / `designs` 150 =
+  **418 object, 310,65 MB**. Copy 418/418, verify độc lập 418/418, 0 lỗi.
+  (Con số 417 ghi trong bản nháp trước là inventory cũ, đã lỗi thời.)
+- Các URL cũ trong database **giữ nguyên** — `/media` là lớp gián tiếp, nó đọc ở
+  đâu là chuyện nội bộ. Không có migration database nào.
+- Link tải ảnh thiết kế trong admin và email đi qua `/media`; upload R2 trả URL
+  tuyệt đối của website để API đặt hàng tiếp tục chấp nhận.
+- Migration kiểm Content-MD5 khi upload, lưu SHA-256 + metadata nguồn, HEAD verify
+  sau upload, `IfNoneMatch` chống ghi đè; chạy lại bỏ qua file đã xác minh.
+  `--verify-only` chỉ đối chiếu metadata/dung lượng, không tải lại nội dung.
+- Đường đọc **và** đường ghi R2 đều đã kiểm chứng trên production (xem mục 2c).
+- Budget alert $1 đã bật. R2 không có spend cap.
+- Vercel CLI chưa cài/đăng nhập — không cần, deploy đi qua git push như thường lệ.
+
+### Sự cố phát sinh trong quá trình làm (chi tiết ở BUG_REPORT.md)
+
+- `/media` trả **500 toàn bộ** sau deploy `4192094` vì `import sharp` ở đầu route;
+  runtime Vercel không nạp được native binary thì cả route sập. Sửa ở `68adb7a`
+  bằng lazy import + fallback phục vụ ảnh gốc với cache 5 phút.
+- Sharp ban đầu **không chạy** trên Vercel. Sửa bằng `serverExternalPackages` +
+  `outputFileTracingIncludes` trong `next.config.ts`. Đã xác minh sau deploy:
+  `?w=640` trả `image/webp` với `max-age=31536000` (không rơi vào nhánh fallback).
+- Credential GitHub bị xoá nhầm dựa trên chẩn đoán sai (`git push` treo trong tool
+  call là do GCM chặn prompt, không phải hết hạn). Cách đúng: chạy push ở chế độ
+  nền. Credential vẫn luôn hợp lệ.
 
 ## Rủi ro còn lại
 
-- **Quên hạ về Free** → mất thêm $25. Đặt nhắc lịch ngay ở Giai đoạn 0.
-- **Copy chưa xong mà đã hết tháng Pro** → kẹt giữa chừng. Làm Giai đoạn 2 sớm,
-  đừng để sát ngày.
-- **Cloudflare có thể yêu cầu thẻ thanh toán cho R2** — chưa xác nhận.
-- **sharp có thể không chạy trên Vercel** (Giai đoạn 1) — nếu vậy ảnh vẫn hiển thị
-  bình thường, chỉ là không được thu nhỏ; xử lý riêng, không chặn kế hoạch R2.
+- **Quên hạ về Free trước 12/11/2026** → mất thêm $25. Đây là rủi ro lớn nhất
+  còn lại, và là việc duy nhất có deadline cứng.
+- ~~Copy chưa xong mà đã hết tháng Pro~~ — **không còn rủi ro**, copy xong 12/10.
+- ~~Cloudflare có thể yêu cầu thẻ thanh toán cho R2~~ — **đã xác nhận: có.**
+  Phải bật R2 subscription (tự gia hạn, gắn payment method) kể cả khi dùng trong
+  hạn mức free. Chủ dự án đã bật 12/10/2026.
+- ~~sharp có thể không chạy trên Vercel~~ — **đã xảy ra và đã sửa xong**, xem mục
+  sự cố ở trên.
+- **Supabase spend cap đang tắt** — vượt hạn mức Pro là trừ thẻ, không bị chặn.
