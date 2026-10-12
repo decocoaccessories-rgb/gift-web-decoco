@@ -124,8 +124,41 @@ chuyện nội bộ của nó.
       frames 47, designs 150). Số object R2 khớp nguồn từng bucket.
 - [x] `--verify-only` chạy độc lập: **418/418 verified, 0 lỗi**.
 - [ ] (cũ) Đối chiếu số object R2 với Supabase: chạy `node --env-file=.env.local scripts/migrate-storage-to-r2.mjs --verify-only`. Báo cáo từng bucket nằm trong `.vercel/r2-migration-verify.json`; phải có `failed=0` và `verified=sourceObjects`.
-- [ ] Duyệt lại site: trang chủ, danh mục, chi tiết, công cụ thiết kế, admin —
-      xác nhận ảnh hiện đủ.
+- [x] Duyệt lại site sau deploy `eb4b666` — **Giai đoạn 2 HOÀN TẤT 12/10/2026**:
+
+```text
+GET /media/products/1788762943877.png        -> 200, image/png,  X-Media-Source: r2
+GET /media/products/1788762943877.png?w=640  -> 200, image/webp, X-Media-Source: r2
+Trang chủ: HTTP 200, 4 sản phẩm, 17 ảnh /media, 0 thẻ ảnh trỏ Supabase
+```
+
+- [x] **Đường GHI vào R2 đã kiểm chứng** (upload thật từ admin, không phải script):
+
+```text
+products/1791791317603.jpeg — 83 KB, KHÔNG có metadata supabase-id -> do app ghi
+  /media/<key>        -> 200, image/jpeg,  X-Media-Source: r2
+  /media/<key>?w=640  -> 200, 25.662 byte, image/webp
+  cdn.trangsucdecoco.vn/<key> -> 200, 85.302 byte
+  Supabase Storage cùng key   -> HTTP 400 (không tồn tại)
+```
+
+Cái cuối là bằng chứng app ghi **chỉ** vào R2, không fallback sang Supabase.
+
+- [x] Budget alert `R2 decoco - vuot han muc free`: ngưỡng **$1**, email
+      decoco.accessories@gmail.com, trạng thái Enabled. R2 không có spend cap nên
+      đây là lớp cảnh báo duy nhất (cạnh default alert Cloudflare tự tạo).
+
+### Chi phí R2 thực tế (12/10/2026)
+
+| Khoản | Đang dùng | Free tier | Vượt thì tính |
+| --- | --- | --- | --- |
+| Lưu trữ | **0,303 GB (3,0%)** | 10 GB/tháng | $0,015/GB-tháng |
+| Class A (ghi) | 446 | 1 triệu/tháng | $4,50/triệu |
+| Class B (đọc) | 1.330 | 10 triệu/tháng | $0,36/triệu |
+| **Egress** | 309 MB | **không giới hạn** | **$0 ở mọi mức** |
+
+Bucket `designs` lớn dần theo đơn (~0,63 MB/thiết kế) — cần thêm ~15.000 đơn mới
+chạm 10 GB, và khi đó 15 GB cũng chỉ $0,075/tháng.
 
 ---
 
