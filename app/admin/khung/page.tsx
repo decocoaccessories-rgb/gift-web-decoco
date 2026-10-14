@@ -68,6 +68,11 @@ export default function AdminFramesPage() {
     }
   }
 
+  // Nối tiếp các lần lưu thứ tự. Kéo thả vài lần liên tiếp mà để request chồng
+  // nhau thì hai snapshot sẽ đua nhau ghi và trộn vào nhau, sinh sort_order trùng.
+  // Mỗi request gửi trọn vẹn thứ tự mong muốn nên chạy tuần tự là đủ: lần cuối thắng.
+  const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -76,26 +81,32 @@ export default function AdminFramesPage() {
     const newIndex = frames.findIndex((f) => f.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const previous = frames;
     const reordered = arrayMove(frames, oldIndex, newIndex).map((f, i) => ({
       ...f,
       sort_order: i,
     }));
     setFrames(reordered);
 
-    const res = await fetch("/api/admin/frames/reorder", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: reordered.map((f) => ({ id: f.id, sort_order: f.sort_order })),
-      }),
-    });
-
-    if (res.ok) {
+    const run = saveChainRef.current.catch(() => {}).then(async () => {
+      const res = await fetch("/api/admin/frames/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: reordered.map((f) => ({ id: f.id, sort_order: f.sort_order })),
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
       toast.success("Đã lưu thứ tự khung mới");
-    } else {
-      setFrames(previous);
-      toast.error("Lỗi khi lưu thứ tự khung");
+    });
+    saveChainRef.current = run;
+
+    try {
+      await run;
+    } catch {
+      // Không rollback về snapshot cũ: sau vài lần kéo nó đã lỗi thời. Lấy lại
+      // thứ tự thật từ máy chủ để giao diện không nói dối.
+      toast.error("Lỗi khi lưu thứ tự khung — đang tải lại từ máy chủ");
+      await fetchFrames();
     }
   }
 
