@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import FallbackImage from "@/components/ui/FallbackImage";
 import ImageSlider from "@/components/ui/ImageSlider";
 import DesignTool from "@/components/DesignTool/DesignTool";
-import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
+import { isOutOfStock, isVariantManaged, isVariantOutOfStock } from "@/lib/stock";
 import type { Frame, Product, ProductVariant } from "@/lib/supabase/types";
 import { trackViewItem } from "@/lib/analytics/gtm";
 
@@ -58,14 +59,18 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
     return [selectedVariant.image_url, ...filtered];
   }, [product.images, selectedVariant]);
 
-  const variantManagedStock = variants.some((v) => typeof v.stock === "number");
+  const variantManagedStock = isVariantManaged(product);
   const effectiveStock = variantManagedStock
     ? selectedVariant && typeof selectedVariant.stock === "number"
       ? selectedVariant.stock
       : null
     : product.stock;
-  const requiresVariantSelection = variantManagedStock && !selectedVariant;
-  const outOfStock = effectiveStock === 0;
+  // Mọi phân loại đều hết -> nói thẳng "Hết hàng" ngay khi khách mở trang, thay vì
+  // bắt họ bấm thử từng phân loại mới phát hiện ra không mua được.
+  const allOutOfStock = isOutOfStock(product);
+  const requiresVariantSelection =
+    variantManagedStock && !selectedVariant && !allOutOfStock;
+  const outOfStock = allOutOfStock || effectiveStock === 0;
   const lowStock = typeof effectiveStock === "number" && effectiveStock > 0 && effectiveStock <= 5;
 
   return (
@@ -92,9 +97,24 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
               Chọn phân loại để xem tồn kho
             </p>
           ) : outOfStock ? (
-            <Badge variant="secondary" className="text-sm">
-              Hết hàng
-            </Badge>
+            <div className="space-y-1">
+              <span className="inline-flex items-center rounded-md bg-foreground/90 px-3 py-1.5 text-sm font-semibold uppercase tracking-wider text-background">
+                Hết hàng
+              </span>
+              {allOutOfStock ? (
+                /* Không để khách vào ngõ cụt: luôn chừa một đường đi tiếp. */
+                <p className="text-sm text-muted-foreground">
+                  Sản phẩm này tạm hết hàng.{" "}
+                  <Link href="/san-pham" className="text-primary underline underline-offset-2">
+                    Xem các sản phẩm khác
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Phân loại này tạm hết. Bạn chọn phân loại khác còn hàng nhé!
+                </p>
+              )}
+            </div>
           ) : lowStock ? (
             <p className="text-sm font-medium text-destructive">
               Chỉ còn {effectiveStock} sản phẩm!
@@ -117,21 +137,40 @@ export default function ProductInteractive({ product, frames, highlights }: Prop
               <div className="flex flex-wrap gap-2">
                 {variants.map((v) => {
                   const active = v.id === selectedVariantId;
+                  // Phân loại hết hàng vẫn hiện (không ẩn) nhưng đánh dấu rõ bằng
+                  // CHỮ "hết" + gạch ngang + ảnh xám, để khách biết trước khi bấm.
+                  // Vẫn bấm được để xem ảnh phân loại đó.
+                  const vOut = isVariantOutOfStock(product, v);
                   return (
                     <button
                       key={v.id}
                       type="button"
                       onClick={() => handleVariantSelect(v.id)}
+                      aria-label={vOut ? `${v.name} — hết hàng` : v.name}
                       className={`flex items-center gap-2 rounded-lg border px-2 py-1.5 text-sm transition-colors ${
                         active
                           ? "border-primary ring-2 ring-primary/30"
                           : "border-border hover:border-primary/40"
-                      }`}
+                      } ${vOut ? "bg-muted/40" : ""}`}
                     >
                       <span className="relative h-7 w-7 rounded-md overflow-hidden bg-secondary/20 shrink-0">
-                        <FallbackImage src={v.image_url} alt={v.name} cdnWidth={160} fill sizes="28px" className="object-cover" />
+                        <FallbackImage
+                          src={v.image_url}
+                          alt={v.name}
+                          cdnWidth={160}
+                          fill
+                          sizes="28px"
+                          className={`object-cover ${vOut ? "grayscale opacity-50" : ""}`}
+                        />
                       </span>
-                      <span>{v.name}</span>
+                      <span className={vOut ? "text-muted-foreground line-through" : ""}>
+                        {v.name}
+                      </span>
+                      {vOut && (
+                        <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                          hết
+                        </span>
+                      )}
                     </button>
                   );
                 })}

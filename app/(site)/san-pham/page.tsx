@@ -11,17 +11,17 @@ export const metadata: Metadata = {
 export const revalidate = 30;
 
 async function getProducts(): Promise<
-  Pick<Product, "slug" | "name" | "price" | "stock" | "images">[]
+  Pick<Product, "slug" | "name" | "price" | "stock" | "images" | "variants">[]
 > {
   try {
     const supabase = createPublicClient();
     const { data } = await supabase
       .from("products")
-      .select("slug, name, price, stock, images")
+      .select("slug, name, price, stock, images, variants")
       .eq("is_visible", true)
       .order("sort_order")
       .order("created_at", { ascending: true });
-    return (data ?? []) as Pick<Product, "slug" | "name" | "price" | "stock" | "images">[];
+    return (data ?? []) as Pick<Product, "slug" | "name" | "price" | "stock" | "images" | "variants">[];
   } catch {
     return [];
   }

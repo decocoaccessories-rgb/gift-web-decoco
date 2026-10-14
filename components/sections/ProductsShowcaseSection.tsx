@@ -5,7 +5,7 @@ import ProductCard from "@/components/ui/ProductCard";
 import type { Product } from "@/lib/supabase/types";
 
 interface ProductsShowcaseSectionProps {
-  products: Pick<Product, "slug" | "name" | "price" | "stock" | "images">[];
+  products: Pick<Product, "slug" | "name" | "price" | "stock" | "images" | "variants">[];
 }
 
 export default function ProductsShowcaseSection({

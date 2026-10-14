@@ -13,7 +13,7 @@ import type { Product, FeedbackItem, FaqItem } from "@/lib/supabase/types";
 
 export default async function LandingPage() {
   let content: Record<string, string> = {};
-  let products: Pick<Product, "slug" | "name" | "price" | "stock" | "images">[] = [];
+  let products: Pick<Product, "slug" | "name" | "price" | "stock" | "images" | "variants">[] = [];
   let feedbackItems: Pick<FeedbackItem, "id" | "image_url" | "alt_text">[] = [];
   let faqItems: Pick<FaqItem, "id" | "question" | "answer">[] = [];
 
@@ -26,7 +26,7 @@ export default async function LandingPage() {
         .in("section", ["hero", "story", "cta"]),
       supabase
         .from("products")
-        .select("slug, name, price, stock, images")
+        .select("slug, name, price, stock, images, variants")
         .eq("is_visible", true)
         .order("sort_order")
         .order("created_at", { ascending: true })
