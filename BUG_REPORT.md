@@ -248,3 +248,10 @@ Lưu ý về Case 4: lần chạy đầu test chọn nhầm một sản phẩm *
 ### Còn lại cần người kiểm tra thủ công
 
 Thao tác kéo-thả bằng chuột thật trên `/admin/san-pham` không nằm trong phạm vi script tự động (script kiểm tra tầng API + CSDL + HTML website). Đề nghị kiểm tra nhanh bằng tay sau khi Vercel deploy xong.
+
+### Xác minh trên production (sau khi Vercel deploy xong)
+
+- Commit `faa593d` đã lên `decocoaccessories-rgb/gift-web-decoco` nhánh `master`; GitHub HEAD khớp.
+- `PUT https://trangsucdecoco.vn/api/admin/products/reorder` (không đăng nhập) → **401** đúng như mong đợi. Trước khi deploy, đường dẫn này trả **405** vì bị route `/api/admin/products/[id]` bắt với `id="reorder"` — sau khi deploy, route tĩnh `reorder/route.ts` được ưu tiên hơn route động, xác nhận bản mới đã live.
+- Thứ tự sản phẩm trên `https://trangsucdecoco.vn/san-pham` khớp 100% với thứ tự trong CSDL:
+  `set-sakura-co-4-la-2-mon > set-bless-2-mon > set-babi-2-mon > set-flower-2-mon`.
