@@ -199,16 +199,38 @@ chạm 10 GB, và khi đó 15 GB cũng chỉ $0,075/tháng.
       là script chạy tay. Nghĩa là sau khi cắt, app không còn đường nào đọc hay
       ghi Supabase Storage.
 
-- [ ] Tắt fallback Supabase bằng `R2_SUPABASE_FALLBACK=false` trong Production + Preview rồi deploy. Cờ này chặn cả đọc lẫn ghi Supabase Storage; chỉ bật sau khi copy + verify hoàn tất.
-      ⚠️ **Phải do chủ dự án làm**: Vercel CLI đã cài nhưng chưa đăng nhập
-      (`vercel whoami` treo ở prompt login), nên tôi không đổi được biến môi trường.
-      Cách nhanh nhất: Vercel Dashboard → project `gift-web-decoco` → Settings →
-      Environment Variables → sửa `R2_SUPABASE_FALLBACK` thành `false` cho cả
-      Production và Preview → Redeploy. Hoặc chạy `vercel login` rồi báo tôi.
-- [ ] Theo dõi 2–3 ngày, xác nhận không còn request nào chạm Supabase Storage.
-      (Phần lớn đã được thay bằng 2 bước kiểm tra ở trên — chúng quét toàn bộ
-      object thay vì lấy mẫu. Việc theo dõi còn lại chỉ để bắt các luồng phát
-      sinh lúc chạy thật, ví dụ khách đặt đơn mới sinh ảnh thiết kế.)
+- [x] **Tắt fallback Supabase — XONG 14/10/2026.** `R2_SUPABASE_FALLBACK` đổi
+      `true` → `false` qua Vercel Dashboard. Đây là **một bản ghi duy nhất** áp cho
+      cả Production lẫn Preview nên chỉ phải sửa một lần; type giữ nguyên `Config`.
+      Xác minh độc lập bằng CLI cho từng môi trường:
+
+```
+vercel env pull --environment=production  -> R2_SUPABASE_FALLBACK="false"
+vercel env pull --environment=preview     -> R2_SUPABASE_FALLBACK="false"
+```
+
+      ⚠️ **Bẫy gặp phải**: nút **Redeploy** của dashboard **build lỗi** —
+      Turbopack báo 16 lỗi `Module not found: Can't resolve
+      '@vercel/turbopack-next/internal/font/google/font'`. Không liên quan đến biến
+      vừa đổi (redeploy tái dùng build cache). Production vẫn chạy bản cũ nên site
+      không gián đoạn. **Cách đi đúng: push một commit lên master** để Vercel build
+      sạch từ git — build `e7l2x0mh3` Ready sau 1 phút. Lần sau cần biến môi trường
+      có hiệu lực thì push commit, đừng bấm Redeploy.
+- [x] **Xác minh SAU khi cắt (14/10/2026): 424/424 key trả HTTP 200 với
+      `X-Media-Source: r2` qua chính route `/media` của production.**
+
+```
+node --env-file=.env.local scripts/check-r2-cutover-ready.mjs --via-media
+-> 424/424, 0 thiếu
+```
+
+      Chế độ `--via-media` đòi header `X-Media-Source` phải bằng `r2`; bất kỳ
+      `supabase` nào cũng bị tính là lỗi. Duyệt mắt `/san-pham` trên production:
+      ảnh hiện đủ, không vỡ.
+
+- [ ] Theo dõi vài ngày nữa, chủ yếu để bắt luồng **ghi** phát sinh lúc chạy thật
+      (khách đặt đơn → `/api/design/export` sinh ảnh thiết kế mới). Đường đọc coi
+      như đã đóng hồ sơ: 424/424 đã kiểm toàn bộ, không phải lấy mẫu.
 - [ ] **Xoá toàn bộ object trong Supabase Storage** — Free chỉ cho 1 GB, và không
       còn lý do giữ bản sao. Giữ lại một bản backup ở máy nếu thấy cần.
       Chỉ làm SAU khi đã tắt fallback và theo dõi xong. Đây là thao tác không hoàn
@@ -232,7 +254,7 @@ tiền egress, deploy bao nhiêu lần cũng được.
 
 ## Tiến độ thực hiện 12/10/2026
 
-**Giai đoạn 0, 1, 2: XONG. Giai đoạn 3: đã kiểm tra sẵn sàng, chờ chủ dự án đổi biến môi trường trên Vercel.** (cập nhật 14/10/2026)
+**Giai đoạn 0, 1, 2: XONG. Giai đoạn 3: đã cắt fallback và xác minh xong; còn xoá Storage + hạ gói.** (cập nhật 14/10/2026)
 
 - Inventory cuối: `site` 25 / `products` 196 / `frames` 47 / `designs` 150 =
   **418 object, 310,65 MB**. Copy 418/418, verify độc lập 418/418, 0 lỗi.
@@ -281,8 +303,8 @@ ngay trước khi bấm cắt, phòng khi có ảnh mới phát sinh).
 
 **Việc còn lại, theo thứ tự bắt buộc:**
 
-1. Chủ dự án đổi `R2_SUPABASE_FALLBACK=false` (Production + Preview) rồi redeploy.
-2. Chạy lại `scripts/check-r2-cutover-ready.mjs` + duyệt site, xác nhận ảnh vẫn hiện.
+1. ~~Đổi `R2_SUPABASE_FALLBACK=false` rồi deploy.~~ **XONG 14/10/2026.**
+2. ~~Chạy lại script kiểm tra + duyệt site.~~ **XONG — 424/424 qua `/media`, `X-Media-Source: r2`.**
 3. Chủ dự án xác nhận → xoá object trong Supabase Storage (không hoàn tác được).
 4. Hạ gói về Free trong Supabase Dashboard.
 
