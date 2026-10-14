@@ -29,6 +29,7 @@ export default async function LandingPage() {
         .select("slug, name, price, stock, images")
         .eq("is_visible", true)
         .order("sort_order")
+        .order("created_at", { ascending: true })
         .limit(4),
       supabase
         .from("feedback_items")

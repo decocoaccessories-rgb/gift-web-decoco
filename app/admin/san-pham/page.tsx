@@ -3,11 +3,24 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/utils";
-import { RefreshCw, Eye, EyeOff, Plus } from "lucide-react";
+import { RefreshCw, Eye, EyeOff, Plus, GripVertical, ChevronUp, ChevronDown } from "lucide-react";
 import type { Product } from "@/lib/supabase/types";
 import ProductEditDialog from "./ProductEditDialog";
 import { getResizedStorageUrl } from "@/lib/supabase/storage-url";
@@ -23,6 +36,10 @@ export default function AdminProductsPage() {
   const [editProduct, setEditProduct] = useState<ProductRow | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
+  );
+
   async function fetchProducts() {
     setLoading(true);
     const res = await fetch("/api/admin/products");
@@ -34,6 +51,51 @@ export default function AdminProductsPage() {
   }
 
   useEffect(() => { fetchProducts(); }, []);
+
+  async function persistOrder(reordered: ProductRow[], previous: ProductRow[]) {
+    setProducts(reordered);
+    const res = await fetch("/api/admin/products/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        items: reordered.map((p) => ({ id: p.id, sort_order: p.sort_order })),
+      }),
+    });
+    if (res.ok) {
+      toast.success("Đã lưu thứ tự sản phẩm mới");
+    } else {
+      setProducts(previous);
+      toast.error("Lỗi khi lưu thứ tự sản phẩm");
+    }
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = products.findIndex((p) => p.id === active.id);
+    const newIndex = products.findIndex((p) => p.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const previous = products;
+    const reordered = arrayMove(products, oldIndex, newIndex).map((p, i) => ({
+      ...p,
+      sort_order: i,
+    }));
+    await persistOrder(reordered, previous);
+  }
+
+  async function moveProduct(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= products.length) return;
+
+    const previous = products;
+    const reordered = arrayMove(products, index, target).map((p, i) => ({
+      ...p,
+      sort_order: i,
+    }));
+    await persistOrder(reordered, previous);
+  }
 
   async function toggleVisibility(id: string, current: boolean) {
     setProducts((prev) =>
@@ -86,7 +148,9 @@ export default function AdminProductsPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="font-heading text-2xl font-semibold">Sản phẩm</h1>
-          <p className="text-sm text-muted-foreground">{products.length} sản phẩm</p>
+          <p className="text-sm text-muted-foreground">
+            {products.length} sản phẩm — kéo thả hoặc bấm ▲▼ để đổi thứ tự hiển thị
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchProducts} className="gap-1.5">
@@ -104,6 +168,7 @@ export default function AdminProductsPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/40 border-b border-border">
               <tr>
+                <th className="text-left px-3 py-3 font-medium text-muted-foreground w-28">Thứ tự</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Sản phẩm</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Giá</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground w-28">Tồn kho</th>
@@ -111,80 +176,52 @@ export default function AdminProductsPage() {
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
-            <tbody>
-              {loading ? (
+            {loading ? (
+              <tbody>
                 <tr>
-                  <td colSpan={5} className="text-center py-12">
+                  <td colSpan={6} className="text-center py-12">
                     <div className="flex justify-center">
                       <div className="h-5 w-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     </div>
                   </td>
                 </tr>
-              ) : products.length === 0 ? (
+              </tbody>
+            ) : products.length === 0 ? (
+              <tbody>
                 <tr>
-                  <td colSpan={5} className="text-center py-12 text-muted-foreground italic">
+                  <td colSpan={6} className="text-center py-12 text-muted-foreground italic">
                     Chưa có sản phẩm nào
                   </td>
                 </tr>
-              ) : (
-                products.map((product) => {
-                  const img = (product.images as string[])[0];
-                  return (
-                    <tr key={product.id} className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="relative h-10 w-10 rounded-md overflow-hidden bg-secondary/30 shrink-0">
-                            {img ? (
-                              <Image src={getResizedStorageUrl(img, 160)} alt={product.name} fill sizes="40px" className="object-cover" />
-                            ) : (
-                              <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/30 font-heading italic">D</div>
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium">{product.name}</p>
-                            <p className="text-xs text-muted-foreground">{product.slug}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 font-semibold text-primary whitespace-nowrap">
-                        {formatPrice(product.price)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          min={0}
-                          value={product.stock}
-                          onChange={(e) => updateStock(product.id, Number(e.target.value))}
-                          className="w-20 h-7 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => toggleVisibility(product.id, product.is_visible)}
-                          className="flex items-center gap-1.5 text-xs"
-                          title={product.is_visible ? "Ẩn sản phẩm" : "Hiển thị sản phẩm"}
-                        >
-                          {product.is_visible ? (
-                            <><Eye className="h-4 w-4 text-primary" /><span className="text-primary">Hiện</span></>
-                          ) : (
-                            <><EyeOff className="h-4 w-4 text-muted-foreground" /><span className="text-muted-foreground">Ẩn</span></>
-                          )}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditProduct(product)}
-                        >
-                          Sửa
-                        </Button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
+              </tbody>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={products.map((p) => p.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <tbody>
+                    {products.map((product, index) => (
+                      <SortableProductRow
+                        key={product.id}
+                        product={product}
+                        index={index}
+                        isFirst={index === 0}
+                        isLast={index === products.length - 1}
+                        onMove={(direction) => moveProduct(index, direction)}
+                        onToggleVisibility={() => toggleVisibility(product.id, product.is_visible)}
+                        onUpdateStock={(stock) => updateStock(product.id, stock)}
+                        onEdit={() => setEditProduct(product)}
+                      />
+                    ))}
+                  </tbody>
+                </SortableContext>
+              </DndContext>
+            )}
           </table>
         </div>
       </div>
@@ -197,5 +234,130 @@ export default function AdminProductsPage() {
         />
       )}
     </div>
+  );
+}
+
+interface SortableProductRowProps {
+  product: ProductRow;
+  index: number;
+  isFirst: boolean;
+  isLast: boolean;
+  onMove: (direction: -1 | 1) => void;
+  onToggleVisibility: () => void;
+  onUpdateStock: (stock: number) => void;
+  onEdit: () => void;
+}
+
+function SortableProductRow({
+  product,
+  index,
+  isFirst,
+  isLast,
+  onMove,
+  onToggleVisibility,
+  onUpdateStock,
+  onEdit,
+}: SortableProductRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: product.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const img = (product.images as string[])[0];
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
+    >
+      <td className="px-3 py-3">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            {...attributes}
+            {...listeners}
+            className="flex h-7 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted cursor-grab active:cursor-grabbing touch-none"
+            aria-label="Kéo để sắp xếp"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+          <span className="w-5 text-xs font-semibold text-muted-foreground tabular-nums">
+            {index + 1}
+          </span>
+          <div className="flex flex-col">
+            <button
+              type="button"
+              onClick={() => onMove(-1)}
+              disabled={isFirst}
+              className="flex h-4 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted disabled:opacity-25 disabled:hover:bg-transparent"
+              aria-label="Di chuyển lên"
+              title="Di chuyển lên"
+            >
+              <ChevronUp className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onMove(1)}
+              disabled={isLast}
+              className="flex h-4 w-5 items-center justify-center rounded text-muted-foreground hover:bg-muted disabled:opacity-25 disabled:hover:bg-transparent"
+              aria-label="Di chuyển xuống"
+              title="Di chuyển xuống"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-3">
+          <div className="relative h-10 w-10 rounded-md overflow-hidden bg-secondary/30 shrink-0">
+            {img ? (
+              <Image src={getResizedStorageUrl(img, 160)} alt={product.name} fill sizes="40px" className="object-cover" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground/30 font-heading italic">D</div>
+            )}
+          </div>
+          <div>
+            <p className="font-medium">{product.name}</p>
+            <p className="text-xs text-muted-foreground">{product.slug}</p>
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3 font-semibold text-primary whitespace-nowrap">
+        {formatPrice(product.price)}
+      </td>
+      <td className="px-4 py-3">
+        <input
+          type="number"
+          min={0}
+          value={product.stock}
+          onChange={(e) => onUpdateStock(Number(e.target.value))}
+          className="w-20 h-7 rounded-md border border-input bg-transparent px-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        />
+      </td>
+      <td className="px-4 py-3">
+        <button
+          onClick={onToggleVisibility}
+          className="flex items-center gap-1.5 text-xs"
+          title={product.is_visible ? "Ẩn sản phẩm" : "Hiển thị sản phẩm"}
+        >
+          {product.is_visible ? (
+            <><Eye className="h-4 w-4 text-primary" /><span className="text-primary">Hiện</span></>
+          ) : (
+            <><EyeOff className="h-4 w-4 text-muted-foreground" /><span className="text-muted-foreground">Ẩn</span></>
+          )}
+        </button>
+      </td>
+      <td className="px-4 py-3">
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          Sửa
+        </Button>
+      </td>
+    </tr>
   );
 }

@@ -31,7 +31,8 @@ export async function GET() {
   const { data, error } = await admin
     .from("products")
     .select("*")
-    .order("sort_order");
+    .order("sort_order")
+    .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data ?? []);

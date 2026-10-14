@@ -19,7 +19,8 @@ async function getProducts(): Promise<
       .from("products")
       .select("slug, name, price, stock, images")
       .eq("is_visible", true)
-      .order("sort_order");
+      .order("sort_order")
+      .order("created_at", { ascending: true });
     return (data ?? []) as Pick<Product, "slug" | "name" | "price" | "stock" | "images">[];
   } catch {
     return [];
