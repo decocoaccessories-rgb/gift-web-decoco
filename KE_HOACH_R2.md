@@ -76,7 +76,9 @@ node --env-file=.env.local scripts/backfill-frame-thumbnails.mjs
 Ghi lại con số "trước → sau" mà script in ra, dán vào `BUG_REPORT.md`.
 
 - [x] Kiểm tra site đã hiện đủ: trang chủ trả HTTP 200 và có lại 4 link sản phẩm; REST API trả 200.
-- [ ] Chụp màn hình Usage → Cached Egress làm mốc đối chiếu.
+- [~] ~~Chụp màn hình Usage → Cached Egress làm mốc đối chiếu.~~ **BỎ** (14/10/2026):
+      mốc này để so trước/sau khi dời ảnh, nhưng Giai đoạn 2 đã xong từ 12/10 nên
+      không còn "trước" để chụp. Thay bằng số đo trực tiếp ở mục kiểm tra dưới đây.
 
 ---
 
@@ -176,10 +178,41 @@ chạm 10 GB, và khi đó 15 GB cũng chỉ $0,075/tháng.
 
 ## Giai đoạn 3 — Cắt đuôi và hạ về Free (trước ngày gia hạn)
 
+- [x] **Kiểm tra sẵn sàng cắt (14/10/2026): 424/424 key có trong R2, 0 thiếu.**
+      `node --env-file=.env.local scripts/check-r2-cutover-ready.mjs`
+      Script đối chiếu **hai chiều**, kiểm trực tiếp trên `cdn.trangsucdecoco.vn`
+      (domain của R2) để không bị cache CDN Vercel đánh lừa:
+
+      A. 418 object đang nằm trong 4 bucket Supabase (site 25 / products 196 /
+         frames 47 / designs 150) — bắt file nào được thêm vào Supabase SAU lần migrate.
+      B. 149 key ảnh mà database đang tham chiếu (`products.images`,
+         `products.variants[].image_url`, `frames.thumbnail_url`,
+         `frames.config.backgroundImage`, `feedback_items`, `site_content`,
+         `orders.design_image_url`) — bắt ảnh được tham chiếu nhưng thiếu ở cả hai nơi.
+
+      Hợp lại 424 key duy nhất, tất cả trả HTTP 200 từ R2. (424 > 418 vì có 6 ảnh
+      upload sau migration, chỉ tồn tại ở R2 — đúng như mong đợi.)
+
+- [x] **Audit code đường ghi (14/10/2026)**: trong toàn bộ `app/`, `lib/`,
+      `components/`, chỉ `lib/storage/upload.ts` chạm Supabase Storage lúc runtime,
+      và nó đã ưu tiên R2 (`isR2Configured()` → `uploadR2Image`). Các chỗ còn lại
+      là script chạy tay. Nghĩa là sau khi cắt, app không còn đường nào đọc hay
+      ghi Supabase Storage.
+
 - [ ] Tắt fallback Supabase bằng `R2_SUPABASE_FALLBACK=false` trong Production + Preview rồi deploy. Cờ này chặn cả đọc lẫn ghi Supabase Storage; chỉ bật sau khi copy + verify hoàn tất.
+      ⚠️ **Phải do chủ dự án làm**: Vercel CLI đã cài nhưng chưa đăng nhập
+      (`vercel whoami` treo ở prompt login), nên tôi không đổi được biến môi trường.
+      Cách nhanh nhất: Vercel Dashboard → project `gift-web-decoco` → Settings →
+      Environment Variables → sửa `R2_SUPABASE_FALLBACK` thành `false` cho cả
+      Production và Preview → Redeploy. Hoặc chạy `vercel login` rồi báo tôi.
 - [ ] Theo dõi 2–3 ngày, xác nhận không còn request nào chạm Supabase Storage.
+      (Phần lớn đã được thay bằng 2 bước kiểm tra ở trên — chúng quét toàn bộ
+      object thay vì lấy mẫu. Việc theo dõi còn lại chỉ để bắt các luồng phát
+      sinh lúc chạy thật, ví dụ khách đặt đơn mới sinh ảnh thiết kế.)
 - [ ] **Xoá toàn bộ object trong Supabase Storage** — Free chỉ cho 1 GB, và không
       còn lý do giữ bản sao. Giữ lại một bản backup ở máy nếu thấy cần.
+      Chỉ làm SAU khi đã tắt fallback và theo dõi xong. Đây là thao tác không hoàn
+      tác được — cần chủ dự án xác nhận rõ ràng trước khi chạy.
 - [ ] Hạ về **Free** trong Settings → Billing.
 - [ ] Kiểm tra lại site sau khi hạ: egress Supabase giờ chỉ còn JSON của database
       (vài trăm KB, cache 5 phút) — không có đường nào chạm nổi 5 GB.
@@ -199,7 +232,7 @@ tiền egress, deploy bao nhiêu lần cũng được.
 
 ## Tiến độ thực hiện 12/10/2026
 
-**Giai đoạn 0, 1, 2: XONG. Giai đoạn 3: chưa bắt đầu.**
+**Giai đoạn 0, 1, 2: XONG. Giai đoạn 3: đã kiểm tra sẵn sàng, chờ chủ dự án đổi biến môi trường trên Vercel.** (cập nhật 14/10/2026)
 
 - Inventory cuối: `site` 25 / `products` 196 / `frames` 47 / `designs` 150 =
   **418 object, 310,65 MB**. Copy 418/418, verify độc lập 418/418, 0 lỗi.
@@ -238,3 +271,20 @@ tiền egress, deploy bao nhiêu lần cũng được.
 - ~~sharp có thể không chạy trên Vercel~~ — **đã xảy ra và đã sửa xong**, xem mục
   sự cố ở trên.
 - **Supabase spend cap đang tắt** — vượt hạn mức Pro là trừ thẻ, không bị chặn.
+
+
+## Cập nhật 14/10/2026
+
+Đã chạy kiểm tra sẵn sàng cho Giai đoạn 3 — **424/424 key đã có trong R2, 0 thiếu**.
+Thêm `scripts/check-r2-cutover-ready.mjs` để chạy lại bất cứ lúc nào (nên chạy lại
+ngay trước khi bấm cắt, phòng khi có ảnh mới phát sinh).
+
+**Việc còn lại, theo thứ tự bắt buộc:**
+
+1. Chủ dự án đổi `R2_SUPABASE_FALLBACK=false` (Production + Preview) rồi redeploy.
+2. Chạy lại `scripts/check-r2-cutover-ready.mjs` + duyệt site, xác nhận ảnh vẫn hiện.
+3. Chủ dự án xác nhận → xoá object trong Supabase Storage (không hoàn tác được).
+4. Hạ gói về Free trong Supabase Dashboard.
+
+**Rủi ro có deadline cứng vẫn còn nguyên: phải hạ về Free trước 12/11/2026, nếu không
+mất thêm $25.** Mục "đặt nhắc lịch ~09/11/2026" vẫn chưa tick.
