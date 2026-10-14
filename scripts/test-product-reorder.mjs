@@ -181,6 +181,39 @@ async function main() {
     JSON.stringify(homeSlugs) === JSON.stringify(visible.slice(0, 4)),
     `thực tế: ${homeSlugs.join(" > ")} | mong đợi: ${visible.slice(0, 4).join(" > ")}`);
 
+  // --- Case 4b: hai request reorder CHỒNG NHAU (bug 14/10/2026) ---
+  // Admin kéo thả vài lần liên tiếp -> nhiều PUT bay cùng lúc. Bản cũ ghi bằng
+  // N câu UPDATE rời rạc qua Promise.all, nên các UPDATE của hai request xen kẽ
+  // và trộn hai snapshot vào nhau, sinh sort_order TRÙNG và có LỖ
+  // (quan sát thật: 0,0,0,1,2,3,4,5,6,7,8,11,12).
+  // Sau khi chuyển sang RPC reorder_products, mỗi request là MỘT câu lệnh nên
+  // kết quả cuối phải khớp đúng một trong hai snapshot, không bao giờ là hỗn hợp.
+  console.log("\nCase 4b — bắn 2 reorder CHỒNG NHAU, kết quả không được là hỗn hợp");
+
+  const orderA = [...afterDb];
+  const orderB = [...afterDb].reverse();
+  const toItems = (list) => list.map((p, i) => ({ id: p.id, sort_order: i }));
+
+  const [resA, resB] = await Promise.all([
+    reorderPut({ items: toItems(orderA) }, cookie),
+    reorderPut({ items: toItems(orderB) }, cookie),
+  ]);
+  check("cả 2 request đều trả 200", resA.status === 200 && resB.status === 200,
+    `A=${resA.status} B=${resB.status}`);
+
+  const raced = await dbProducts();
+  const racedOrders = raced.map((p) => p.sort_order);
+  check("không có sort_order trùng lặp",
+    new Set(racedOrders).size === racedOrders.length, racedOrders.join(","));
+  check("sort_order vẫn liên tục 0..n-1 (không có lỗ)",
+    racedOrders.every((v, i) => v === i), racedOrders.join(","));
+
+  const idsNow = JSON.stringify(raced.map((p) => p.id));
+  check("thứ tự cuối khớp ĐÚNG MỘT trong hai snapshot, không trộn lẫn",
+    idsNow === JSON.stringify(orderA.map((p) => p.id)) ||
+    idsNow === JSON.stringify(orderB.map((p) => p.id)),
+    "kết quả là hỗn hợp của cả hai -> ghi vẫn chưa nguyên tử");
+
   // --- Case 5: khôi phục thứ tự ban đầu ---
   console.log("\nCase 5 — khôi phục thứ tự ban đầu");
   const restore = original.map((p, i) => ({ id: p.id, sort_order: i }));

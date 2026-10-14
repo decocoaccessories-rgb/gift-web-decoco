@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import Image from "next/image";
 import {
@@ -52,20 +52,34 @@ export default function AdminProductsPage() {
 
   useEffect(() => { fetchProducts(); }, []);
 
-  async function persistOrder(reordered: ProductRow[], previous: ProductRow[]) {
+  // Nối tiếp các lần lưu thứ tự. Kéo thả vài lần liên tiếp mà để request chồng
+  // nhau thì hai snapshot sẽ đua nhau ghi và trộn vào nhau, sinh sort_order trùng.
+  // Mỗi request gửi trọn vẹn thứ tự mong muốn nên chạy tuần tự là đủ: lần cuối thắng.
+  const saveChainRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  async function persistOrder(reordered: ProductRow[]) {
     setProducts(reordered);
-    const res = await fetch("/api/admin/products/reorder", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: reordered.map((p) => ({ id: p.id, sort_order: p.sort_order })),
-      }),
-    });
-    if (res.ok) {
+
+    const run = saveChainRef.current.catch(() => {}).then(async () => {
+      const res = await fetch("/api/admin/products/reorder", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: reordered.map((p) => ({ id: p.id, sort_order: p.sort_order })),
+        }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
       toast.success("Đã lưu thứ tự sản phẩm mới");
-    } else {
-      setProducts(previous);
-      toast.error("Lỗi khi lưu thứ tự sản phẩm");
+    });
+    saveChainRef.current = run;
+
+    try {
+      await run;
+    } catch {
+      // Không rollback về snapshot cũ: sau vài lần kéo nó đã lỗi thời. Lấy lại
+      // thứ tự thật từ máy chủ để giao diện không nói dối.
+      toast.error("Lỗi khi lưu thứ tự — đang tải lại thứ tự từ máy chủ");
+      await fetchProducts();
     }
   }
 
@@ -77,24 +91,22 @@ export default function AdminProductsPage() {
     const newIndex = products.findIndex((p) => p.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const previous = products;
     const reordered = arrayMove(products, oldIndex, newIndex).map((p, i) => ({
       ...p,
       sort_order: i,
     }));
-    await persistOrder(reordered, previous);
+    await persistOrder(reordered);
   }
 
   async function moveProduct(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= products.length) return;
 
-    const previous = products;
     const reordered = arrayMove(products, index, target).map((p, i) => ({
       ...p,
       sort_order: i,
     }));
-    await persistOrder(reordered, previous);
+    await persistOrder(reordered);
   }
 
   async function toggleVisibility(id: string, current: boolean) {

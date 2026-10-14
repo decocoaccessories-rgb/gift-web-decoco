@@ -25,16 +25,23 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Invalid data", details: parsed.error.flatten() }, { status: 422 });
   }
 
+  // Một câu lệnh duy nhất (RPC reorder_products, migration 014) thay cho N lần
+  // UPDATE rời rạc. Trước đây Promise.all phát N request độc lập: hai lần kéo thả
+  // liên tiếp chồng nhau thì các UPDATE xen kẽ và trộn hai snapshot vào nhau, sinh
+  // sort_order trùng + có lỗ. Giờ request hoặc áp dụng trọn vẹn, hoặc không gì cả.
   const admin = createAdminClient();
-  const results = await Promise.all(
-    parsed.data.items.map((item) =>
-      admin.from("products").update({ sort_order: item.sort_order }).eq("id", item.id)
-    )
-  );
+  const { data: updated, error } = await admin.rpc("reorder_products", {
+    items: parsed.data.items,
+  });
 
-  const failed = results.find((r) => r.error);
-  if (failed?.error) {
-    return NextResponse.json({ error: failed.error.message }, { status: 500 });
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (updated !== parsed.data.items.length) {
+    return NextResponse.json(
+      { error: `Chỉ cập nhật được ${updated}/${parsed.data.items.length} sản phẩm` },
+      { status: 422 }
+    );
   }
 
   // Xoá cache ISR để thứ tự mới hiện ra ngoài website ngay, không chờ 30-60s.
