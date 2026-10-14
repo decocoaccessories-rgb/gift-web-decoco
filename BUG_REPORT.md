@@ -245,9 +245,11 @@ Lưu ý về Case 4: lần chạy đầu test chọn nhầm một sản phẩm *
 - `npm run build` → pass; route `/api/admin/products/reorder` xuất hiện trong bảng route.
 - `GET /admin/san-pham` (có cookie admin) → HTTP 200, render đủ cột "Thứ tự" và dòng hướng dẫn kéo thả, không có error overlay.
 
-### Còn lại cần người kiểm tra thủ công
+### Kiểm tra thủ công
 
-Thao tác kéo-thả bằng chuột thật trên `/admin/san-pham` không nằm trong phạm vi script tự động (script kiểm tra tầng API + CSDL + HTML website). Đề nghị kiểm tra nhanh bằng tay sau khi Vercel deploy xong.
+Thao tác kéo-thả bằng chuột thật trên `/admin/san-pham` không nằm trong phạm vi script tự động (script chỉ phủ tầng API + CSDL + HTML website), nên cần người kiểm tra tay.
+
+→ **Đã kiểm tra: OK.** Người dùng xác nhận kéo thả trên trang admin chạy đúng (2026-10-14). Toàn bộ hạng mục xác minh của báo cáo này đã hoàn tất.
 
 ### Xác minh trên production (sau khi Vercel deploy xong)
 
