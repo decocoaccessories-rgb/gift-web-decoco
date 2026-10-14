@@ -64,11 +64,23 @@ function toKey(value) {
   return null;
 }
 
+/**
+ * Mặc định hỏi thẳng R2 (dùng TRƯỚC khi cắt, để biết có an toàn không).
+ * Với `--via-media`, hỏi qua route /media của site (dùng SAU khi cắt, để chứng
+ * minh người dùng thật vẫn tải được ảnh và không rơi về Supabase nữa).
+ */
+const VIA_MEDIA = process.argv.includes("--via-media");
+const SITE = (process.env.CHECK_SITE ?? "https://trangsucdecoco.vn").replace(/\/+$/, "");
+const TARGET = VIA_MEDIA ? `${SITE}/media` : R2_BASE;
+
 async function existsInR2(key) {
-  const url = `${R2_BASE}/${key.split("/").map(encodeURIComponent).join("/")}`;
+  const url = `${TARGET}/${key.split("/").map(encodeURIComponent).join("/")}`;
   try {
     const r = await fetch(url, { method: "HEAD", cache: "no-store" });
-    return r.status;
+    if (!VIA_MEDIA) return r.status;
+    // Sau khi cắt fallback, bất kỳ "supabase" nào cũng là lỗi.
+    const src = r.headers.get("x-media-source");
+    return r.status === 200 && src !== "r2" ? `200 nhưng X-Media-Source=${src}` : r.status;
   } catch (e) {
     return `ERR ${e.message}`;
   }
@@ -130,7 +142,10 @@ console.log(`   ${referenced.size} key duy nhất được tham chiếu từ dat
 
 // ---------------------------------------------------------------- Đối chiếu
 const allKeys = [...new Set([...supabaseKeys, ...referenced.keys()])];
-console.log(`Đang kiểm tra ${allKeys.length} key trên ${R2_BASE} ...\n`);
+console.log(`Đang kiểm tra ${allKeys.length} key trên ${TARGET} ...`);
+console.log(VIA_MEDIA
+  ? "   (chế độ --via-media: qua route /media của site, đòi X-Media-Source=r2)\n"
+  : "   (hỏi thẳng R2, bỏ qua cache CDN của Vercel)\n");
 
 const statuses = await mapLimit(allKeys, 12, existsInR2);
 const missing = allKeys.filter((_, i) => statuses[i] !== 200);
