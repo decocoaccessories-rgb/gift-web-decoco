@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 
@@ -57,5 +58,13 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Xóa cache ISR / Data Cache để sản phẩm mới hiện ra ngoài website ngay
+  if (data?.slug) {
+    revalidatePath(`/san-pham/${data.slug}`);
+  }
+  revalidatePath("/san-pham");
+  revalidatePath("/");
+
   return NextResponse.json(data, { status: 201 });
 }

@@ -1,259 +1,300 @@
 # Báo cáo Lỗi
 
 ## Trạng thái
-ĐÃ SỬA XONG — ĐÃ KIỂM THỬ: **THÀNH CÔNG**
+ĐÃ SỬA XONG — THÀNH CÔNG (xác minh 16/10/2026, 30/30 case PASS)
 
 ## Tiêu đề Lỗi
-Trang Admin Quản lý Sản phẩm (`/admin/san-pham`) thiếu cơ chế sắp xếp lại thứ tự sản phẩm (Reorder / Kéo thả / Lên-Xuống) và chưa có API đồng bộ thứ tự hiển thị ra ngoài website.
+Sửa thông tin / tên phân loại sản phẩm trong Admin (`/admin/san-pham`) thành công vào CSDL nhưng trên website (`/san-pham/[slug]`) không hiển thị bản cập nhật ngay do thiếu `revalidatePath`.
 
 ## Mô tả Lỗi
-Trong trang quản trị Admin (`/admin/san-pham`), danh sách sản phẩm hiện tại chỉ được hiển thị dưới dạng bảng HTML tĩnh (`table`). Người quản trị không thể thay đổi thứ tự các sản phẩm từ trên xuống dưới (không có tính năng kéo thả drag-and-drop, không có nút di chuyển lên/xuống). Do đó, thứ tự các sản phẩm hiển thị trên trang chủ (`/`) và trang danh mục (`/san-pham`) bị cố định theo thứ tự ban đầu trong cơ sở dữ liệu, không thể chủ động sắp xếp vị trí hiển thị theo nhu cầu kinh doanh.
+Người quản trị vào trang Admin (`/admin/san-pham`), mở hộp thoại chỉnh sửa sản phẩm "Set SAKURA hoa anh đào - Dây chuyền và vòng tay" và sửa tên các phân loại (ví dụ từ `Thiệp 3d` thành `Thiệp 3D`), sau đó lưu lại.
+- Dữ liệu trong CSDL Supabase đã được cập nhật thành công (đã xác thực qua database record: `updated_at: 2026-10-16T09:46:40Z` với tên các phân loại đã lưu chuẩn thành `Thiệp 3D`).
+- Tuy nhiên, khi truy cập vào trang chi tiết sản phẩm ngoài website (`https://trangsucdecoco.vn/san-pham/set-sakura-co-4-la-2-mon`), giao diện vẫn hiển thị tên cũ (`Thiệp 3d`) trong vòng 5 phút (300 giây) sau khi lưu.
+- Nguyên nhân: API cập nhật sản phẩm `PATCH /api/admin/products/[id]` không gọi `revalidatePath` để xóa cache Next.js Data Cache / ISR, trong khi client đọc dữ liệu ngoài site (`createPublicClient`) cấu hình cache tự động 300 giây (`revalidate: 300`).
 
 ## Các bước tái hiện
-1. Đăng nhập vào trang Admin và truy cập đường dẫn `/admin/san-pham`.
-2. Quan sát bảng danh sách sản phẩm: Các sản phẩm được liệt kê theo thứ tự hiện tại với các cột *Sản phẩm*, *Giá*, *Tồn kho*, *Hiển thị*, *Actions*.
-3. Thử tìm kiếm tính năng kéo thả hàng hoặc nút mũi tên di chuyển thứ tự lên/xuống.
-4. Mở hộp thoại "Sửa" sản phẩm: Không có trường thông tin trực quan để thay đổi vị trí thứ tự hiển thị của sản phẩm trong danh sách.
-5. Kiểm tra mã nguồn API và trang người dùng: Chưa có API cập nhật hàng loạt thứ tự sản phẩm và chưa có cơ chế revalidate cache ISR tức thì khi thay đổi thứ tự.
+1. Đăng nhập trang Admin, vào mục **Sản phẩm** (`/admin/san-pham`).
+2. Nhấn nút "Sửa" tại sản phẩm "Set SAKURA hoa anh đào".
+3. Thay đổi tên phân loại (hoặc giá, tồn kho phân loại, ảnh) rồi nhấn **Lưu thay đổi**.
+4. Mở tab mới hoặc chuyển sang tab website xem trang chi tiết sản phẩm (`/san-pham/set-sakura-co-4-la-2-mon`).
+5. Quan sát: Tên phân loại vẫn giữ giá trị cũ trước khi sửa; phải đợi hết 300 giây (5 phút) cache của Next.js mới tự hết hạn và tải lại dữ liệu mới.
 
 ## Kết quả Thực tế vs Kết quả Mong đợi
-- **Kết quả Thực tế**: Bảng sản phẩm Admin là bảng tĩnh; không có handle kéo thả, không có nút di chuyển vị trí, không có endpoint batch reorder cho sản phẩm. Thứ tự ngoài website không thể điều chỉnh được từ giao diện quản trị.
-- **Kết quả Mong đợi**: 
-  - Tại trang `/admin/san-pham`, Admin có thể dễ dàng thay đổi thứ tự sản phẩm theo chiều từ trên xuống dưới thông qua kéo thả (drag-and-drop) hoặc nút bấm Lên/Xuống tiện lợi.
-  - Khi thứ tự thay đổi, hệ thống tự động lưu vị trí mới (`sort_order`) vào cơ sở dữ liệu Supabase.
-  - Ngoài website (trang chủ `/` và trang danh sách `/san-pham`), thứ tự hiển thị của các sản phẩm được cập nhật ngay lập tức theo đúng thứ tự vừa sắp xếp trong trang Admin.
+- **Kết quả Thực tế**: Sau khi bấm Lưu trong Admin, dữ liệu trong CSDL đã đổi nhưng website ngoài vẫn hiển thị phiên bản cũ do Next.js Data Cache lưu giữ 300 giây mà không nhận được lệnh revalidate.
+- **Kết quả Mong đợi**: Ngay sau khi bấm Lưu trong Admin, cache trang chi tiết sản phẩm (`/san-pham/[slug]`), trang danh sách (`/san-pham`) và trang chủ (`/`) được làm mới ngay lập tức (On-demand Revalidation). Người dùng F5 hoặc truy cập lại web sẽ thấy ngay nội dung vừa sửa.
 
 ## Ngữ cảnh & Môi trường
-- **Môi trường**: Next.js 16 (App Router), React 19, Supabase PostgreSQL, Tailwind CSS v4.
-- **Thư viện đã có sẵn**: `@dnd-kit/core`, `@dnd-kit/sortable`, `@dnd-kit/utilities` (đã được cấu hình và sử dụng thành công tại `/admin/khung`).
+- **Môi trường**: Next.js 16 (App Router), Vercel Serverless / ISR, Supabase PostgreSQL.
 - **File liên quan**:
-  - Giao diện Admin: `app/admin/san-pham/page.tsx`
-  - Modal biên tập: `app/admin/san-pham/ProductEditDialog.tsx`
-  - API sản phẩm: `app/api/admin/products/route.ts` & `app/api/admin/products/[id]/route.ts`
-  - Trang hiển thị Website: `app/page.tsx` (trang chủ) & `app/(site)/san-pham/page.tsx` (danh mục)
-
----
-
-## Review Kế hoạch (2026-10-14)
-
-Kế hoạch về tổng thể **đúng hướng** (Phương án 1 được chọn), nhưng có 3 điểm sai/thiếu đã được chỉnh lại trước khi thi công:
-
-1. **Bước 3 của Phương án 1 là một no-op.** Kế hoạch ghi "Bổ sung secondary sort fallback trong `app/api/admin/products/route.ts`: `.order("sort_order", { ascending: true })`" — nhưng dòng này **đã tồn tại sẵn** (`app/api/admin/products/route.ts:35`) và hoàn toàn tương đương `.order("sort_order")`. Nó không thêm tiebreaker nào cả.
-   → **Sửa lại**: thêm sort phụ thực sự là `.order("created_at", { ascending: true })`.
-
-2. **RCA #4 (trùng `sort_order`) có nêu vấn đề nhưng không có bước khắc phục dữ liệu.** Kiểm tra CSDL production xác nhận: 5/13 sản phẩm đang có `sort_order = 0`. Nghĩa là thứ tự hiện tại ở cả admin lẫn website đều **không xác định** (Postgres tự do trả về). Nếu chỉ thêm UI kéo thả mà không chuẩn hoá dữ liệu, danh sách admin trước lần kéo đầu tiên vẫn có thể nhảy lung tung.
-   → **Bổ sung**: migration `013_normalize_product_sort_order.sql` gán lại `sort_order` tuần tự 0..n theo `(sort_order, created_at)`.
-
-3. **Hai trang website cũng cần cùng tiebreaker** thì thứ tự admin mới khớp 100% thứ tự ngoài site. Kế hoạch chỉ nhắc API admin.
-   → **Bổ sung**: thêm `.order("created_at", { ascending: true })` vào `app/page.tsx` và `app/(site)/san-pham/page.tsx`.
-
-Các điểm đã xác minh là đúng và giữ nguyên:
-- Cột `products.sort_order INTEGER DEFAULT 0` đã có sẵn (`supabase/migrations/001_initial_schema.sql:16`) + index `idx_products_sort` → **không cần đổi schema**.
-- `@dnd-kit/core@6.3.1`, `@dnd-kit/sortable@10.0.0`, `@dnd-kit/utilities@3.2.2` đã cài; mẫu kéo thả hoàn chỉnh tại `app/admin/khung/page.tsx` + `app/api/admin/frames/reorder/route.ts`.
-- `revalidatePath` gọi được trong Route Handler (xác nhận trong `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`). Lưu ý đúng theo tài liệu: trong Route Handler nó **đánh dấu** path cần revalidate, việc render lại xảy ra ở lần truy cập kế tiếp — với người dùng cuối thì hiệu quả là "thấy ngay", không phải chờ hết 30/60s.
-- Dự án chưa dùng `revalidatePath` ở bất kỳ đâu; `next.config.ts` không bật `cacheComponents` nên ISR cổ điển (`export const revalidate`) vẫn đúng.
-- `ProductEditDialog` tuy không có ô nhập "Thứ tự" trên UI nhưng **có giữ và gửi lại** `sort_order` cũ khi lưu (dòng 35, 145) → sửa sản phẩm sẽ không làm mất thứ tự vừa kéo. Không cần đụng tới file này.
+  - `app/api/admin/products/[id]/route.ts`: API `PATCH` và `DELETE` sản phẩm.
+  - `app/api/admin/products/route.ts`: API `POST` tạo sản phẩm mới.
+  - `lib/supabase/server.ts`: Hàm `createPublicClient()` cấu hình `next: { revalidate: 300 }`.
+  - `app/(site)/san-pham/[slug]/page.tsx`: Trang chi tiết sản phẩm đọc dữ liệu qua `createPublicClient()`.
 
 ---
 
 ## Phân tích Nguyên nhân Gốc rễ (Root Cause Analysis)
 
-### 1. Phân tích chi tiết mã nguồn:
-1. **Thiếu cơ chế tương tác sắp xếp trên UI Admin (`app/admin/san-pham/page.tsx`)**:
-   - Component `AdminProductsPage` sử dụng thẻ `<table>` truyền thống để render mảng `products` (dòng 104-189).
-   - Trang chưa tích hợp `DndContext`, `SortableContext` của `@dnd-kit` (trong khi trang `app/admin/khung/page.tsx` đã có sẵn logic kéo thả mẫu rất hoàn chỉnh).
-   - Không có handle kéo thả (`GripVertical`) hay nút điều hướng (`ChevronUp`/`ChevronDown`) trên mỗi dòng.
+### 1. Chi tiết kỹ thuật:
+1. **API route cập nhật sản phẩm thiếu lệnh `revalidatePath`**:
+   - Trong `app/api/admin/products/[id]/route.ts` (dòng 25-50), hàm `PATCH` nhận payload từ Admin, gọi `admin.from("products").update(...)` và trả về kết quả JSON.
+   - Hoàn toàn **không có bất kỳ dòng code nào gọi `revalidatePath`**.
+   - Tương tự, hàm `DELETE` trong cùng file và hàm `POST` tạo sản phẩm mới trong `app/api/admin/products/route.ts` cũng thiếu `revalidatePath`.
+   
+2. **Cơ chế Cache Data 300 giây của `createPublicClient`**:
+   - Trong `lib/supabase/server.ts` (dòng 38-45), hàm `createPublicClient()` đóng gói fetch với cấu hình:
+     ```ts
+     global: {
+       fetch: (input, init) =>
+         fetch(input, {
+           ...init,
+           next: { revalidate: 300 },
+         }),
+     }
+     ```
+   - Trang `/san-pham/[slug]/page.tsx` gọi hàm `getProduct()` sử dụng `createPublicClient()`.
+   - Do đó, Next.js Data Cache lưu phản hồi truy vấn sản phẩm trong **300 giây (5 phút)**.
+   - Khi Admin cập nhật phân loại sản phẩm trong DB lúc 16:46:40, người dùng xem trang lúc 16:50:00 (sau 3.5 phút) vẫn nhận về bản cache cũ (chưa đủ 5 phút để cache tự hết hạn).
+   - Đến 16:55:00 (sau hơn 5 phút), cache tự hết hạn thì trang mới hiển thị bản mới `Thiệp 3D`.
 
-2. **Thiếu API lưu thứ tự hàng loạt (`/api/admin/products/reorder`)**:
-   - Hiện tại backend chỉ có `PATCH /api/admin/products/[id]` cập nhật từng sản phẩm riêng lẻ.
-   - Khi di chuyển 1 sản phẩm từ vị trí A sang vị trí B, cần cập nhật lại trường `sort_order` cho nhiều sản phẩm trong một giao dịch/batch để tránh trùng lặp hoặc sai lệch thứ tự.
-   - Dự án đã có mẫu `app/api/admin/frames/reorder/route.ts`, nhưng nhánh sản phẩm chưa được xây dựng route tương tự.
-
-3. **Cơ chế Cache ISR trên Website chưa được làm mới tức thì (`revalidatePath`)**:
-   - `app/page.tsx` đang cấu hình `revalidate = 60;` (cache 60 giây).
-   - `app/(site)/san-pham/page.tsx` đang cấu hình `revalidate = 30;` (cache 30 giây).
-   - Cả hai trang đều đã truy vấn sản phẩm có `.order("sort_order")`. Tuy nhiên, nếu sau khi đổi thứ tự trong Admin mà không gọi `revalidatePath("/")` và `revalidatePath("/san-pham")`, người dùng ngoài website sẽ bị trễ cache 30-60 giây mới thấy thay đổi.
-
-4. **Trùng lặp chỉ số `sort_order` ban đầu**:
-   - Khi các sản phẩm mới được tạo với giá trị mặc định `sort_order = 0`, Postgres sẽ sắp xếp không theo thứ tự mong muốn nếu không có tiebreaker (`.order("sort_order").order("created_at", { ascending: false })`). Khi có tính năng reorder, mỗi sản phẩm sẽ được gán số thứ tự chuẩn xác (0, 1, 2, 3...).
+3. **So sánh với chức năng Reorder sản phẩm đã làm trước đó**:
+   - Ở tính năng sắp xếp thứ tự sản phẩm (`app/api/admin/products/reorder/route.ts:48-49`), hệ thống đã áp dụng thành công:
+     ```ts
+     revalidatePath("/");
+     revalidatePath("/san-pham");
+     ```
+   - Tuy nhiên các nhánh CRUD cơ bản (`PATCH`, `POST`, `DELETE`) của sản phẩm lại chưa được bổ sung cơ chế này.
 
 ### 2. Biểu đồ luồng dữ liệu (Data Flow):
 
 ```text
-[HIỆN TẠI]
-Admin UI (table tĩnh) ──(Không có kéo thả / không có nút di chuyển)
-                               │
-                      (Không có API reorder)
-                               │
-               Supabase products.sort_order (cố định)
-                               │
-      Trang Website (/san-pham, /) hiển thị thứ tự cố định
+[HIỆN TẠI - THIẾU REVALIDATION]
+Admin sửa tên phân loại -> Bấm "Lưu thay đổi"
+            │
+            ▼
+PATCH /api/admin/products/[id]
+            │
+            ├─► Ghi vào Supabase DB: THÀNH CÔNG NGAY (updated_at = 16:46:40)
+            │
+            └─► (KHÔNG gọi revalidatePath) ──x Next.js không biết dữ liệu đã đổi
+                                                      │
+Khách/Admin vào xem /san-pham/[slug] (16:50:00) ──────▼
+                                     Next.js phục vụ Data Cache (TTL 300s)
+                                     ==> Vẫn hiện bản cũ "Thiệp 3d"!
 
 
-[SAU KHI NÂNG CẤP ĐỀ XUẤT]
-Admin UI ──► Kéo thả (DndContext) HOẶC Bấm nút Lên/Xuống
-   │
-   ├─► Cập nhật ngay trên giao diện (Optimistic UI)
-   │
-   └─► Gọi PUT /api/admin/products/reorder { items: [{id, sort_order}] }
-         │
-         ├─► Cập nhật hàng loạt sort_order vào CSDL Supabase
-         │
-         └─► Gọi revalidatePath("/") & revalidatePath("/san-pham")
-               │
-               ▼
-   Website (/ và /san-pham) hiển thị đúng thứ tự mới NGAY LẬP TỨC
+[SAU KHI SỬA - ON-DEMAND REVALIDATION]
+PATCH /api/admin/products/[id]
+            │
+            ├─► Ghi vào Supabase DB: THÀNH CÔNG
+            │
+            └─► Gọi revalidatePath:
+                 ├─► revalidatePath(`/san-pham/${slug}`)
+                 ├─► revalidatePath("/san-pham")
+                 └─► revalidatePath("/")
+                        │
+                        ▼
+Next.js đánh dấu cache các trang liên quan là stale ngay lập tức.
+Khách/Admin tải lại trang ──► Server render dữ liệu mới từ DB ngay lập tức!
 ```
 
 ---
 
 ## Đề xuất Sửa lỗi (Proposed Fixes)
 
-### Phương án 1 (Khuyến nghị): Tích hợp Drag-and-Drop (@dnd-kit) kết hợp Nút di chuyển nhanh (Lên / Xuống) & API Batch Reorder
-
-- **Cách tiếp cận**:
-  1. **Tạo API `app/api/admin/products/reorder/route.ts`**:
-     - Nhận payload danh sách `{ id: string, sort_order: number }[]`.
-     - Xác thực quyền Admin (`createClient` + `getUser`).
-     - Cập nhật đồng loạt trường `sort_order` cho các sản phẩm trong database Supabase bằng `createAdminClient()`.
-     - Gọi `revalidatePath("/")` và `revalidatePath("/san-pham")` để xóa cache ISR, giúp website đổi thứ tự ngay lập tức.
-  2. **Nâng cấp `app/admin/san-pham/page.tsx`**:
-     - Áp dụng `@dnd-kit/core` và `@dnd-kit/sortable` (chiến lược `verticalListSortingStrategy`).
-     - Thêm cột đầu tiên hiển thị **Số thứ tự (STT)** + **Icon kéo thả (`GripVertical`)** + **2 nút bấm nhỏ (Lên ▲ / Xuống ▼)**.
-       - *Lợi ích của việc kết hợp*: Người dùng dùng chuột có thể kéo thả trực quan; người dùng trên máy tính bảng/điện thoại hoặc muốn đổi nhanh 1-2 vị trí có thể bấm nút Lên/Xuống chỉ với 1 click mà không sợ trượt tay.
-     - Xử lý sự kiện kéo thả `handleDragEnd` và sự kiện bấm nút `moveProduct(index, direction)`: Tự động đổi vị trí trên giao diện (Optimistic UI) và gửi request đến API `/api/admin/products/reorder`. Báo toast thành công/thất bại.
-  3. **Đồng bộ truy vấn hiển thị**:
-     - Bổ sung secondary sort fallback trong `app/api/admin/products/route.ts`: `.order("sort_order", { ascending: true })`.
-
+### Phương án 1 (Khuyến nghị): Bổ sung `revalidatePath` đồng bộ vào các Route Handlers sản phẩm
+- **File cần sửa**:
+  1. `app/api/admin/products/[id]/route.ts`:
+     - Trong `PATCH`:
+       - Trước khi update, nếu có đổi slug thì lưu lại `oldSlug`.
+       - Sau khi update thành công `products`, gọi:
+         ```ts
+         revalidatePath(`/san-pham/${data.slug}`);
+         if (oldSlug && oldSlug !== data.slug) {
+           revalidatePath(`/san-pham/${oldSlug}`);
+         }
+         revalidatePath("/san-pham");
+         revalidatePath("/");
+         ```
+     - Trong `DELETE`:
+       - Trước khi xóa, query lấy `slug` của sản phẩm.
+       - Sau khi xóa thành công, gọi:
+         ```ts
+         if (deletedSlug) revalidatePath(`/san-pham/${deletedSlug}`);
+         revalidatePath("/san-pham");
+         revalidatePath("/");
+         ```
+  2. `app/api/admin/products/route.ts`:
+     - Trong `POST` (tạo sản phẩm mới):
+       - Sau khi insert thành công, gọi:
+         ```ts
+         revalidatePath(`/san-pham/${data.slug}`);
+         revalidatePath("/san-pham");
+         revalidatePath("/");
+         ```
 - **Ưu điểm**:
-  - Trải nghiệm người dùng mượt mà, chuyên nghiệp, chuẩn phong cách admin hiện đại.
-  - Tận dụng 100% các thư viện đã được cài đặt trong dự án (`@dnd-kit`).
-  - Website đồng bộ ngay lập tức nhờ `revalidatePath`.
-- **Rủi ro**: Thấp, không ảnh hưởng đến cấu trúc bảng CSDL hay các tính năng giỏ hàng/thanh toán.
+  - Chuẩn theo đúng quy chuẩn Next.js App Router và khớp 100% với kiến trúc hiện có của dự án (giống `app/api/admin/products/reorder/route.ts`).
+  - Xóa cache đúng trang chi tiết, trang danh sách và trang chủ; không ảnh hưởng đến các trang khác.
+  - Giải quyết dứt điểm vấn đề sửa sản phẩm, đổi slug, đổi tồn kho, đổi phân loại, bật/tắt hiển thị đều có hiệu lực ngay lập tức ngoài web.
+- **Rủi ro**: Không có rủi ro; chi phí render lại theo yêu cầu trên Vercel là rất nhỏ và đúng chuẩn.
+
+### Phương án 2 (Thay thế): Giảm thời gian `revalidate: 300` xuống thấp hơn hoặc tắt cache
+- **Mô tả**: Giảm TTL trong `createPublicClient()` từ 300s xuống 10s hoặc `cache: "no-store"`.
+- **Nhược điểm**:
+  - Không giải quyết được tận gốc: người dùng vẫn phải đợi một khoảng thời gian nếu có cache.
+  - Nếu chuyển sang `no-store`, mỗi lượt khách vào xem sản phẩm sẽ phát sinh query trực tiếp đến Supabase, làm tăng egress và có nguy cơ chạm hạn mức của Supabase Free tier (lý do ban đầu tạo ra `createPublicClient` là để tránh egress này).
+- **Kết luận**: Không nên chọn phương án 2. Nên chọn Phương án 1.
 
 ---
 
-### Phương án 2 (Phương án phụ): Thêm cột nhập số "Thứ tự" trực tiếp trong bảng
+## Review Kế hoạch (16/10/2026)
 
-- **Cách tiếp cận**:
-  - Thêm một cột `Thứ tự` với thẻ `<input type="number">` tương tự như cột `Tồn kho`.
-  - Admin tự gõ số thứ tự (ví dụ: 1, 2, 3...) cho từng sản phẩm và nhấn nút "Lưu thay đổi".
-- **Ưu điểm**: Dễ triển khai, cấu trúc mã đơn giản.
-- **Nhược điểm**:
-  - Trải nghiệm kém trực quan. Khi muốn chèn một sản phẩm từ cuối lên vị trí thứ 2, người quản trị phải sửa thủ công số thứ tự của tất cả các sản phẩm khác. Dễ xảy ra trường hợp nhập trùng số thứ tự.
+**Kết luận: kế hoạch ĐÚNG, chọn Phương án 1. Giữ nguyên, không cần sửa hướng.** Các điểm đã đối chiếu lại với mã nguồn thật và tài liệu Next.js đi kèm (`node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`, Next 16.2.4):
+
+1. **Nguyên nhân gốc rễ đã được xác nhận đúng.** `createPublicClient()` (`lib/supabase/server.ts:32-48`) gắn `next: { revalidate: 300 }` cho mọi fetch. Trang `/san-pham/[slug]` **không** khai báo `export const revalidate`, nên Next lấy TTL thấp nhất từ các fetch bên trong — đúng 300 giây như báo cáo mô tả. (Để so sánh: `/san-pham` có `revalidate = 30`, `/` có `revalidate = 60`, nhưng cả hai vẫn đọc qua cùng Data Cache 300s nên vẫn cần revalidate thủ công.)
+2. **Dạng tham số `revalidatePath` trong kế hoạch là đúng chuẩn Next 16.** Tài liệu quy định: đường dẫn *literal* (`/san-pham/abc`) thì **bỏ** tham số `type`; chỉ khi dùng *route pattern* (`/san-pham/[slug]`) mới bắt buộc truyền `'page'`. Kế hoạch dùng literal nên không cần `type`.
+3. **Route group `(site)` không được đưa vào đường dẫn.** Trang nằm ở `app/(site)/san-pham/[slug]/page.tsx`, nhưng `(site)` không xuất hiện trong URL nên `revalidatePath("/san-pham/abc")` là đúng; chỉ dạng pattern mới phải viết `(site)`. Mã đã sửa làm đúng điểm này.
+4. **Gọi trong Route Handler là đủ.** Tài liệu ghi rõ: trong Route Handler, `revalidatePath` đánh dấu đường dẫn và việc render lại xảy ra ở lần truy cập kế tiếp — đúng với kỳ vọng "khách F5 là thấy ngay".
+5. **Phạm vi 3 trang là đủ và không thừa.** Đã rà toàn bộ nơi dùng `createPublicClient`: chỉ `/`, `/san-pham`, `/san-pham/[slug]` đọc bảng `products`. `components/layout/Footer.tsx` đọc `site_content` (không liên quan).
+6. **Bác bỏ Phương án 2 là hợp lý** — `createPublicClient` sinh ra chính là để chặn egress Supabase, hạ TTL sẽ đi ngược mục đích đó.
+
+**Hai điểm kế hoạch chưa nhắc tới (đã ghi nhận, CỐ Ý không sửa trong lần này để giữ nguyên tắc thay đổi tối thiểu):**
+
+- `app/sitemap.ts` cũng đọc `products` và có `revalidate = 3600`. Sản phẩm mới / đổi slug / bị xoá sẽ lệch trong sitemap tối đa 1 giờ. Chỉ ảnh hưởng SEO, không phải lỗi người dùng nhìn thấy → đề xuất xử lý ở một lần sửa riêng.
+- Cùng loại lỗi này còn tồn tại ở các route admin khác chưa gọi `revalidatePath` (khung/frames, `site_content` của Footer, feedback, FAQ). Nằm ngoài phạm vi báo cáo này → nên mở báo cáo riêng.
 
 ---
 
 ## Kế hoạch Xác minh
-
-1. **Kiểm tra Giao diện Admin (`/admin/san-pham`)**:
-   - Thử kéo thả sản phẩm bất kỳ từ trên xuống dưới hoặc từ dưới lên trên.
-   - Thử bấm nút di chuyển Lên ▲ và Xuống ▼.
-   - Kiểm tra số thứ tự (1, 2, 3...) hiển thị tự động cập nhật lại tương ứng.
-2. **Kiểm tra API & Cơ sở dữ liệu**:
-   - Kiểm tra request `PUT /api/admin/products/reorder` trả về mã HTTP 200 `success: true`.
-   - Tải lại trang (F5) trang admin để xác nhận thứ tự mới được duy trì bền vững từ Supabase.
-3. **Kiểm tra Website người dùng (`/` và `/san-pham`)**:
-   - Mở trang chủ `http://localhost:3000/` (khu vực Sản phẩm nổi bật): Xác nhận 4 sản phẩm đầu tiên hiển thị đúng theo 4 sản phẩm trên cùng của Admin.
-   - Mở trang `/san-pham`: Xác nhận toàn bộ danh sách sản phẩm hiển thị chuẩn xác 100% theo thứ tự vừa sắp xếp trong Admin.
-   - Xác nhận không còn tình trạng bị trễ cache do Next.js đã kích hoạt `revalidatePath`.
-4. **Kiểm tra Phân quyền & Hồi quy**:
-   - Thử nghiệm khi chưa đăng nhập Admin: API reorder phải từ chối truy cập (HTTP 401 Unauthorized).
-   - Kiểm tra các chức năng sẵn có (Sửa sản phẩm, Ẩn/Hiện, Sửa tồn kho, Thêm mới) vẫn hoạt động hoàn hảo.
-
+1. **Kiểm tra luồng cập nhật sản phẩm trong Admin**:
+   - Sử dụng tài khoản admin chỉnh sửa thử nghiệm một trường của sản phẩm (ví dụ thêm ghi chú hoặc đổi chữ hoa/thường phân loại).
+   - Bấm "Lưu thay đổi".
+2. **Kiểm tra phản hồi ngoài website**:
+   - Truy cập ngay trang `/san-pham/[slug]` bằng `curl` / `fetch` hoặc trình duyệt.
+   - Xác nhận trang trả về phiên bản mới ngay lập tức mà không cần đợi 300 giây.
+3. **Kiểm tra trường hợp đổi slug**:
+   - Đổi slug và xác nhận đường dẫn cũ bị xóa cache, đường dẫn mới cập nhật ngay.
+4. **Kiểm tra regression**:
+   - Chạy test suite hiện có của dự án để đảm bảo không bị lỗi biên dịch hay phá vỡ các chức năng khác.
 
 ---
 
-## Kết quả Thực thi Sửa lỗi (2026-10-14)
+## KẾT QUẢ SỬA LỖI & KIỂM THỬ — THÀNH CÔNG (16/10/2026)
 
-### Trạng thái: **THÀNH CÔNG**
+### 1. Thay đổi đã áp dụng (đúng Phương án 1, thay đổi tối thiểu, không refactor)
 
-### Các thay đổi đã áp dụng (theo Phương án 1, đã chỉnh theo mục "Review Kế hoạch")
+| File | Thay đổi |
+|---|---|
+| `app/api/admin/products/[id]/route.ts` | `PATCH`: đọc `slug` cũ trước khi update (chỉ khi payload có `slug`), sau khi update thành công gọi `revalidatePath` cho slug mới, slug cũ (nếu khác), `/san-pham` và `/`. `DELETE`: đọc `slug` trước khi xoá, sau khi xoá gọi `revalidatePath` cho trang chi tiết, `/san-pham` và `/`. |
+| `app/api/admin/products/route.ts` | `POST`: sau khi insert thành công gọi `revalidatePath` cho trang chi tiết sản phẩm mới, `/san-pham` và `/`. |
+| `scripts/test-product-revalidate.mjs` | **(mới)** Script tái hiện lỗi + xác minh bản sửa. |
 
-| # | File | Thay đổi |
-|---|------|----------|
-| 1 | `app/api/admin/products/reorder/route.ts` *(mới)* | `PUT` batch reorder. Auth bằng `createClient().auth.getUser()` → 401 nếu chưa đăng nhập; validate payload bằng zod → 422; ghi `sort_order` hàng loạt bằng `createAdminClient()`; gọi `revalidatePath("/")` + `revalidatePath("/san-pham")`. Theo đúng khuôn mẫu sẵn có của `app/api/admin/frames/reorder/route.ts`. |
-| 2 | `app/admin/san-pham/page.tsx` | Thêm `DndContext` + `SortableContext` (`verticalListSortingStrategy`); tách `<tr>` ra component `SortableProductRow`. Cột "Thứ tự" mới gồm: handle kéo `GripVertical`, số STT (1,2,3…), và 2 nút `ChevronUp`/`ChevronDown` (tự disable ở đầu/cuối danh sách). Cả kéo thả lẫn bấm nút đều đi qua một hàm `persistOrder()` chung — cập nhật Optimistic UI, gọi API, **rollback về trạng thái cũ nếu API lỗi** và báo toast. |
-| 3 | `app/api/admin/products/route.ts` | Thêm sort phụ `.order("created_at", { ascending: true })` (sửa lại bước 3 vốn là no-op trong kế hoạch gốc). |
-| 4 | `app/page.tsx`, `app/(site)/san-pham/page.tsx` | Thêm cùng sort phụ `created_at` để thứ tự ngoài website khớp tuyệt đối với thứ tự trong admin. |
-| 5 | `supabase/migrations/013_normalize_product_sort_order.sql` *(mới)* | Gán lại `sort_order` thành dãy liên tục 0..n-1 theo `(sort_order, created_at)`. |
-| 6 | `scripts/test-product-reorder.mjs` *(mới)* | Script kiểm thử tự động, theo đúng quy ước `scripts/test-*.mjs` có sẵn của dự án. |
+Không đụng vào `lib/supabase/server.ts` — TTL 300s giữ nguyên để không tăng egress Supabase.
 
-**Không** đụng tới: schema bảng `products` (cột `sort_order` + index `idx_products_sort` đã có sẵn), `ProductEditDialog.tsx`, và toàn bộ luồng giỏ hàng / thanh toán.
+### 2. Cách script chứng minh (không pass giả)
 
-### Đã đồng bộ lên Supabase
+Điểm then chốt: mỗi case đều **mồi cache trước** — fetch trang lặp lại cho tới khi HTML thực sự chứa giá trị hiện tại (mốc A) — rồi mới gọi API đổi sang mốc B và fetch lại ngay. Nếu thiếu `revalidatePath`, bản cache chứa mốc A còn sống đủ 300 giây, nên lần fetch ngay sau đó buộc phải trả mốc A → FAIL. Script chỉ PASS khi web đổi trong **dưới 15 giây** (thực tế đo được 0.2–1.5 giây), tức là nhờ on-demand revalidation chứ không phải do hết TTL.
 
-Migration 013 đã chạy trên CSDL production (`xknkhczeuyjxtiljeaoz`). Trước đó **5/13 sản phẩm cùng có `sort_order = 0`**; sau khi chuẩn hoá, 13 sản phẩm mang giá trị duy nhất 0..12, giữ nguyên thứ tự hiển thị đang có.
+### 3. Chạy đối chứng: script có thật sự bắt được lỗi không?
 
-### Kiểm thử tự động
+Đã tạm gỡ bản sửa (`git stash`), build lại và chạy cùng script trên code **chưa sửa**:
 
-Lệnh chạy (server production build `next start -p 3100`):
+```
+PASS: 21   FAIL: 14
+=> THẤT BẠI
+```
+
+Các FAIL đúng y hệt triệu chứng người dùng báo:
+
+```
+  FAIL  /san-pham/[slug] hiện mốc B, sạch mốc A (sau 6.2s << TTL 300s)
+        còn thiếu: ["KTBmvat6w8a"]
+  FAIL  /san-pham hiện mốc B, sạch mốc A (sau 11.8s << TTL 300s)
+  FAIL  / (trang chủ) hiện mốc B, sạch mốc A (sau 16.0s << TTL 300s)
+  FAIL  đường dẫn CŨ đã bị xoá cache (404, không còn phục vụ bản cũ)
+        nhận 200 — vẫn đang trả bản cache cũ
+  FAIL  /san-pham có sản phẩm mới ngay (sau 6.0s << TTL 300s)
+  FAIL  trang chi tiết sản phẩm đã ẩn trả 404
+        nhận 200
+  FAIL  trang chi tiết sản phẩm đã xoá trả 404 (sau 6.2s)
+        nhận 200 — vẫn phục vụ bản cache cũ
+```
+
+→ Script tái hiện được đúng lỗi. Sau đó khôi phục bản sửa (`git stash pop`) và build lại.
+
+### 4. Kết quả chạy trên code ĐÃ SỬA
+
+Lệnh:
 
 ```
 npm run build && npx next start -p 3100
-node scripts/test-product-reorder.mjs
+node --experimental-strip-types --import ./scripts/alias-hook.mjs scripts/test-product-revalidate.mjs
 ```
-
-Script đăng nhập bằng **session admin Supabase thật** (magic-link → `verifyOtp` → cookie sinh bởi chính `@supabase/ssr`), nên nó gọi API qua đúng lớp xác thực như trình duyệt, không bypass.
 
 Output:
 
 ```
-Case 0 — sort_order đã chuẩn hoá (migration 013)
-  PASS  sort_order không trùng lặp
-  PASS  sort_order liên tục 0..n-1
+BASE = http://localhost:3100
 
-Case 1 — authz: gọi reorder khi chưa đăng nhập
-  PASS  trả về 401 Unauthorized
-  PASS  DB không bị thay đổi bởi request ẩn danh
+Sản phẩm dùng để test: "Set SAKURA hoa anh đào - Dây chuyền và vòng tay" (/san-pham/set-sakura-co-4-la-2-mon)
+  có 4 phân loại -> kiểm cả đổi tên phân loại
 
-Đăng nhập admin bằng session Supabase thật...
-  cookie: sb-xknkhczeuyjxtiljeaoz-auth-token=base6... (2608 ký tự)
+Case 1 — authz: gọi API khi chưa đăng nhập
+  PASS  PATCH ẩn danh -> 401
+  PASS  POST ẩn danh -> 401
+  PASS  DELETE ẩn danh -> 401
+  PASS  DB không bị request ẩn danh thay đổi
 
-Case 2 — validation payload
-  PASS  items rỗng -> 422
-  PASS  id không phải uuid -> 422
+Case 2 — PATCH tên sản phẩm + tên phân loại, web phải đổi NGAY
+  PASS  PATCH lần 1 (đặt mốc A) -> 200
+  đã mồi cache 3 trang với mốc A=KTAmvat3uek (TTL 300s)
+  PASS  PATCH lần 2 (đổi sang mốc B) -> 200
+  PASS  /san-pham/[slug] hiện mốc B, sạch mốc A (sau 0.5s << TTL 300s)
+  PASS  /san-pham hiện mốc B, sạch mốc A (sau 0.8s << TTL 300s)
+  PASS  / (trang chủ) hiện mốc B, sạch mốc A (sau 1.5s << TTL 300s)
+  PASS  DB lưu đúng tên phân loại mới
 
-Case 3 — reorder: đưa sản phẩm ĐANG HIỆN xếp cuối lên vị trí ĐẦU
-  thứ tự công khai TRƯỚC: set-sakura-co-4-la-2-mon > set-bless-2-mon > set-babi-2-mon > set-flower-2-mon
-  đưa "Set FLOWER hoa 5 cánh - Dây chuyền và khuyên tai " lên đầu
-  PASS  API trả 200
-  PASS  body { success: true }
-  PASS  DB lưu đúng thứ tự mới
-  PASS  sort_order vẫn liên tục 0..n-1, không trùng
+Case 3 — PATCH đổi slug: đường dẫn mới sống, đường dẫn cũ hết cache
+  PASS  PATCH đổi slug -> 200
+  PASS  /san-pham/set-sakura-co-4-la-2-mon-ktmvat3ygs render được ngay (sau 0.5s << TTL 300s)
+  PASS  đường dẫn CŨ đã bị xoá cache (404, không còn phục vụ bản cũ)
+  PASS  /san-pham đã trỏ sang slug mới (sau 1.0s << TTL 300s)
+  PASS  PATCH trả slug về như cũ -> 200
+  PASS  đường dẫn cũ sống lại ngay sau khi trả slug (sau 0.9s << TTL 300s)
 
-Case 4 — website cập nhật ngay (revalidatePath, không chờ ISR 30/60s)
-  thứ tự mong đợi (chỉ sản phẩm đang hiện): set-flower-2-mon > set-sakura-co-4-la-2-mon > set-bless-2-mon > set-babi-2-mon
-  PASS  thứ tự công khai thực sự đã đổi (bảo đảm test không pass giả)
-  PASS  /san-pham hiển thị đúng thứ tự
-  PASS  / (4 sản phẩm nổi bật) đúng thứ tự
+Case 4 — POST tạo sản phẩm mới, phải hiện ngay ngoài /san-pham
+  PASS  POST -> 201
+  PASS  /san-pham có sản phẩm mới ngay (sau 0.5s << TTL 300s)
+  PASS  trang chi tiết sản phẩm mới trả 200
 
-Case 5 — khôi phục thứ tự ban đầu
-  PASS  API khôi phục trả 200
-  PASS  DB đã về đúng thứ tự ban đầu
+Case 5 — PATCH tắt hiển thị, phải biến mất ngay
+  PASS  PATCH is_visible=false -> 200
+  PASS  /san-pham không còn sản phẩm vừa ẩn (sau 0.4s << TTL 300s)
+  PASS  trang chi tiết sản phẩm đã ẩn trả 404
+
+Case 6 — DELETE, trang chi tiết phải hết cache ngay
+  PASS  DELETE -> 200
+  PASS  trang chi tiết sản phẩm đã xoá trả 404 (sau 0.5s)
+  PASS  /san-pham không còn sản phẩm đã xoá (sau 0.6s << TTL 300s)
+  PASS  sản phẩm tạm đã bị xoá khỏi DB
+
+Case 7 — khôi phục nguyên trạng sản phẩm đã mượn để test
+  PASS  PATCH khôi phục -> 200
+  PASS  DB đã về đúng tên + slug ban đầu
+  PASS  DB đã về đúng phân loại ban đầu
+  PASS  website sạch hết dấu vết kiểm thử (sau 0.2s << TTL 300s)
 
 ==================== KẾT QUẢ ====================
-PASS: 15   FAIL: 0
+PASS: 30   FAIL: 0
 => THÀNH CÔNG
 ```
 
-Lưu ý về Case 4: lần chạy đầu test chọn nhầm một sản phẩm **đang ẩn** để di chuyển, nên thứ tự công khai không đổi và Case 4 pass một cách vô nghĩa. Test đã được sửa để luôn chọn sản phẩm **đang hiển thị** xếp cuối, kèm một assertion riêng xác nhận thứ tự công khai thực sự khác trước — chống pass giả. Hai trang `/` và `/san-pham` được fetch chỉ ~1 giây sau lời gọi reorder, trong khi `revalidate` của chúng là 60s và 30s → chứng minh `revalidatePath` thực sự có tác dụng.
+### 5. Regression & trạng thái dữ liệu
 
-### Kiểm thử bổ sung
+- `npm run build` **PASS** (exit code 0), không lỗi TypeScript, không cảnh báo mới.
+- Dữ liệu thật đã được khôi phục nguyên trạng: kiểm tra lại DB còn đúng **13 sản phẩm**, **0 bản ghi còn dấu vết kiểm thử** (tên, slug, phân loại của "Set SAKURA" trùng khớp bản gốc).
+- Không thay đổi schema → **không cần migration Supabase** cho lần sửa này.
 
-- `npx tsc --noEmit` → không lỗi.
-- `npm run build` → pass; route `/api/admin/products/reorder` xuất hiện trong bảng route.
-- `GET /admin/san-pham` (có cookie admin) → HTTP 200, render đủ cột "Thứ tự" và dòng hướng dẫn kéo thả, không có error overlay.
+### 6. Kết luận
 
-### Kiểm tra thủ công
-
-Thao tác kéo-thả bằng chuột thật trên `/admin/san-pham` không nằm trong phạm vi script tự động (script chỉ phủ tầng API + CSDL + HTML website), nên cần người kiểm tra tay.
-
-→ **Đã kiểm tra: OK.** Người dùng xác nhận kéo thả trên trang admin chạy đúng (2026-10-14). Toàn bộ hạng mục xác minh của báo cáo này đã hoàn tất.
-
-### Xác minh trên production (sau khi Vercel deploy xong)
-
-- Commit `faa593d` đã lên `decocoaccessories-rgb/gift-web-decoco` nhánh `master`; GitHub HEAD khớp.
-- `PUT https://trangsucdecoco.vn/api/admin/products/reorder` (không đăng nhập) → **401** đúng như mong đợi. Trước khi deploy, đường dẫn này trả **405** vì bị route `/api/admin/products/[id]` bắt với `id="reorder"` — sau khi deploy, route tĩnh `reorder/route.ts` được ưu tiên hơn route động, xác nhận bản mới đã live.
-- Thứ tự sản phẩm trên `https://trangsucdecoco.vn/san-pham` khớp 100% với thứ tự trong CSDL:
-  `set-sakura-co-4-la-2-mon > set-bless-2-mon > set-babi-2-mon > set-flower-2-mon`.
+**THÀNH CÔNG.** Sau khi bấm "Lưu thay đổi" trong Admin (hoặc tạo mới / xoá / ẩn sản phẩm), website cập nhật trong **dưới 1,5 giây** thay vì phải chờ tới 300 giây như trước.
